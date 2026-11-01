@@ -213,5 +213,5 @@ revoke all on function public.apply_duitku_callback(
   text, text, bigint, text, text, text, text, text[], jsonb
 ) from public, anon, authenticated;
 grant execute on function public.apply_duitku_callback(
-  text, text, bigint, text, text, text, text, jsonb
+  text, text, bigint, text, text, text, text, text[], jsonb
 ) to service_role;

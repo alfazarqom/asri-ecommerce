@@ -7,7 +7,7 @@ create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   merchant_order_id text not null unique,
   status text not null default 'pending_payment'
-    check (status in ('pending_payment', 'confirmed', 'cancelled')),
+    check (status in ('pending_payment', 'confirmed', 'cancelled', 'payment_review')),
   payment_status text not null default 'pending'
     check (payment_status in ('pending', 'paid', 'failed', 'expired', 'refunded')),
   currency char(3) not null default 'IDR' check (currency = 'IDR'),
@@ -169,7 +169,7 @@ begin
 
     update public.orders
        set payment_status = 'paid',
-           status = case when status = 'pending_payment' then 'confirmed' else status end,
+           status = case when status = 'pending_payment' then 'confirmed'\n                        when status = 'cancelled' then 'payment_review'\n                        else status end,
            updated_at = now()
      where id = v_payment.order_id
        and payment_status <> 'paid';

@@ -84,7 +84,7 @@ stringToSign = merchantCode + amount + merchantOrderId
 signature = HMAC_SHA256(stringToSign, apiKey)
 ```
 
-It then matches merchant order ID, amount, and Duitku `reference` against the persisted pending payment and invokes `apply_duitku_callback`. The database function locks the payment row and processes each callback event key once. Only `resultCode = 00` is mapped to paid; non-success result codes are recorded as failed while a paid transaction cannot be moved backwards by a later failure callback.
+It then matches merchant order ID, amount, and Duitku `reference` against the persisted pending payment and invokes `apply_duitku_callback`. The database function locks the payment row and processes each callback event key once. Only `resultCode = 00` is mapped to paid; non-success result codes are recorded as failed while a paid transaction cannot be moved backwards by a later failure callback. A verified success arriving after an order was cancelled changes its order status to `payment_review` so it cannot silently enter fulfillment.
 
 The POP page specifies the callback POST format and signature but does not clearly prescribe an acknowledgment response body. This implementation returns HTTP 200 `OK` only after the database transaction commits and HTTP 500 for transient processing failures. Confirm retry/acknowledgment expectations with Duitku merchant support before production.
 

@@ -223,12 +223,10 @@ Deno.serve(async (request) => {
         signal: AbortSignal.timeout(20_000),
       });
     } catch {
-      await supabase.from("payment_transactions").update({
-        status: "failed",
-        provider_result_message: "Duitku request failed before a response was received",
-        updated_at: new Date().toISOString(),
-      }).eq("id", insertedPayment.id);
-      return jsonResponse(502, { error: "duitku_unreachable" });
+      // The provider may have received the request even if the response timed out.
+      // Keep the transaction in "creating" for callback/manual reconciliation;
+      // never create a second invoice automatically.
+      return jsonResponse(502, { error: "duitku_result_unknown_reconciliation_required" });
     }
 
     const responseText = await providerResponse.text();

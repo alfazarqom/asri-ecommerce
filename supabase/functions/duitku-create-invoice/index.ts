@@ -80,6 +80,12 @@ Deno.serve(async (request) => {
     if (typedOrder.status !== "pending_payment" || typedOrder.payment_status !== "pending") {
       return jsonResponse(409, { error: "order_not_payable" });
     }
+    const email = typeof typedOrder.customer_email === "string"
+      ? typedOrder.customer_email.trim()
+      : "";
+    if (!email || email.length > 255 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      return jsonResponse(409, { error: "valid_customer_email_required" });
+    }
     if (typedOrder.currency !== "IDR" || !Number.isSafeInteger(typedOrder.total_amount) ||
       typedOrder.total_amount <= 0 ||
       typedOrder.total_amount !== typedOrder.subtotal_amount + typedOrder.shipping_amount) {
@@ -166,7 +172,6 @@ Deno.serve(async (request) => {
     const requestSignature = await hmacSha256Hex(apiKey, merchantCode + timestamp);
     const firstName = safeText(typedOrder.customer_first_name, 50) ?? "Customer";
     const lastName = safeText(typedOrder.customer_last_name, 50) ?? "";
-    const email = safeText(typedOrder.customer_email, 50) ?? "";
     const phoneNumber = safeText(typedOrder.customer_phone, 50) ?? "";
     const customerVaName = `${firstName} ${lastName}`.trim().slice(0, 20);
     const billingAddress = asRecord(typedOrder.billing_address);
@@ -193,7 +198,6 @@ Deno.serve(async (request) => {
       customerDetail: {
         firstName,
         lastName,
-        email,
         phoneNumber,
         billingAddress: addressForDuitku(billingAddress),
         shippingAddress: addressForDuitku(shippingAddress),

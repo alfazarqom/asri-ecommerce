@@ -10,7 +10,10 @@
       }
     },
     "Standalone": {
-      "BottomActionBar": {},
+      "Layout": {
+        "Content": {},
+        "BottomActionBar": {}
+      },
       "ProductDetailPage": {},
       "CartPage": {},
       "CheckoutPage": {},

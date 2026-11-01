@@ -14,7 +14,8 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType = request.headers.get("content-type")?.toLowerCase() ??
+      "";
     if (!contentType.includes("application/x-www-form-urlencoded")) {
       return new Response("Unsupported Media Type", { status: 415 });
     }
@@ -28,9 +29,11 @@ Deno.serve(async (request) => {
     const resultCode = safeText(form.get("resultCode"), 10);
     const paymentCode = safeText(form.get("paymentCode"), 30);
 
-    if (!merchantCode || !amountText || !merchantOrderId || !reference ||
+    if (
+      !merchantCode || !amountText || !merchantOrderId || !reference ||
       !signature || !resultCode || !/^\d+$/.test(amountText) ||
-      !/^[a-f0-9]{64}$/.test(signature)) {
+      !/^[a-f0-9]{64}$/.test(signature)
+    ) {
       return new Response("Bad Request", { status: 400 });
     }
 
@@ -75,8 +78,9 @@ Deno.serve(async (request) => {
       paymentCode ?? "",
     ].join("|"));
 
-    const creditCardMethods = (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
-      .split(",").map((value) => value.trim()).filter(Boolean);
+    const creditCardMethods =
+      (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
+        .split(",").map((value) => value.trim()).filter(Boolean);
 
     const supabase = createClient(
       requiredEnv("SUPABASE_URL"),
@@ -110,7 +114,10 @@ Deno.serve(async (request) => {
     // a response body; acknowledge only after the database transaction commits.
     return new Response("OK", {
       status: 200,
-      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      },
     });
   } catch {
     return jsonResponse(500, { error: "callback_processing_failed" });

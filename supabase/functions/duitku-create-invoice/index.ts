@@ -59,7 +59,10 @@ Deno.serve(async (request) => {
     const environment = duitkuEnvironment();
     const callbackUrl = requiredEnv("DUITKU_CALLBACK_URL");
     const returnUrl = requiredEnv("DUITKU_RETURN_URL");
-    if (new URL(callbackUrl).protocol !== "https:" || new URL(returnUrl).protocol !== "https:") {
+    if (
+      new URL(callbackUrl).protocol !== "https:" ||
+      new URL(returnUrl).protocol !== "https:"
+    ) {
       throw new Error("Duitku callback and return URLs must use HTTPS");
     }
 
@@ -77,18 +80,28 @@ Deno.serve(async (request) => {
     if (!order) return jsonResponse(404, { error: "order_not_found" });
 
     const typedOrder = order as OrderRow;
-    if (typedOrder.status !== "pending_payment" || typedOrder.payment_status !== "pending") {
+    if (
+      typedOrder.status !== "pending_payment" ||
+      typedOrder.payment_status !== "pending"
+    ) {
       return jsonResponse(409, { error: "order_not_payable" });
     }
     const email = typeof typedOrder.customer_email === "string"
       ? typedOrder.customer_email.trim()
       : "";
-    if (!email || email.length > 255 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (
+      !email || email.length > 255 ||
+      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
+    ) {
       return jsonResponse(409, { error: "valid_customer_email_required" });
     }
-    if (typedOrder.currency !== "IDR" || !Number.isSafeInteger(typedOrder.total_amount) ||
+    if (
+      typedOrder.currency !== "IDR" ||
+      !Number.isSafeInteger(typedOrder.total_amount) ||
       typedOrder.total_amount <= 0 ||
-      typedOrder.total_amount !== typedOrder.subtotal_amount + typedOrder.shipping_amount) {
+      typedOrder.total_amount !==
+        typedOrder.subtotal_amount + typedOrder.shipping_amount
+    ) {
       return jsonResponse(409, { error: "invalid_order_total" });
     }
 
@@ -108,7 +121,9 @@ Deno.serve(async (request) => {
           status: "pending",
         });
       }
-      return jsonResponse(409, { error: "invoice_already_created_or_in_progress" });
+      return jsonResponse(409, {
+        error: "invoice_already_created_or_in_progress",
+      });
     }
 
     const { data: items, error: itemsError } = await supabase
@@ -119,13 +134,17 @@ Deno.serve(async (request) => {
 
     if (itemsError) throw new Error("Could not load order items");
     const orderItems = (items ?? []) as ItemRow[];
-    if (orderItems.length === 0) return jsonResponse(409, { error: "order_has_no_items" });
+    if (orderItems.length === 0) {
+      return jsonResponse(409, { error: "order_has_no_items" });
+    }
 
     let computedSubtotal = 0;
     const itemDetails = orderItems.map((item) => {
-      if (!Number.isSafeInteger(item.unit_price) || item.unit_price < 0 ||
+      if (
+        !Number.isSafeInteger(item.unit_price) || item.unit_price < 0 ||
         !Number.isSafeInteger(item.quantity) || item.quantity <= 0 ||
-        !item.product_name?.trim()) {
+        !item.product_name?.trim()
+      ) {
         throw new Error("Invalid order item snapshot");
       }
       computedSubtotal += item.unit_price * item.quantity;
@@ -136,7 +155,10 @@ Deno.serve(async (request) => {
       };
     });
 
-    if (!Number.isSafeInteger(computedSubtotal) || computedSubtotal !== typedOrder.subtotal_amount) {
+    if (
+      !Number.isSafeInteger(computedSubtotal) ||
+      computedSubtotal !== typedOrder.subtotal_amount
+    ) {
       return jsonResponse(409, { error: "order_items_total_mismatch" });
     }
 
@@ -159,7 +181,10 @@ Deno.serve(async (request) => {
         amount: typedOrder.total_amount,
         currency: "IDR",
         payment_method: safeText(Deno.env.get("DUITKU_PAYMENT_METHOD"), 10),
-        request_snapshot: { paymentAmount: typedOrder.total_amount, itemCount: itemDetails.length },
+        request_snapshot: {
+          paymentAmount: typedOrder.total_amount,
+          itemCount: itemDetails.length,
+        },
       })
       .select("id")
       .single();
@@ -169,8 +194,12 @@ Deno.serve(async (request) => {
     }
 
     const timestamp = Date.now().toString();
-    const requestSignature = await hmacSha256Hex(apiKey, merchantCode + timestamp);
-    const firstName = safeText(typedOrder.customer_first_name, 50) ?? "Customer";
+    const requestSignature = await hmacSha256Hex(
+      apiKey,
+      merchantCode + timestamp,
+    );
+    const firstName = safeText(typedOrder.customer_first_name, 50) ??
+      "Customer";
     const lastName = safeText(typedOrder.customer_last_name, 50) ?? "";
     const phoneNumber = safeText(typedOrder.customer_phone, 50) ?? "";
     const customerVaName = `${firstName} ${lastName}`.trim().slice(0, 20);
@@ -234,7 +263,9 @@ Deno.serve(async (request) => {
       // The provider may have received the request even if the response timed out.
       // Keep the transaction in "creating" for callback/manual reconciliation;
       // never create a second invoice automatically.
-      return jsonResponse(502, { error: "duitku_result_unknown_reconciliation_required" });
+      return jsonResponse(502, {
+        error: "duitku_result_unknown_reconciliation_required",
+      });
     }
 
     const responseText = await providerResponse.text();
@@ -250,12 +281,19 @@ Deno.serve(async (request) => {
     const paymentUrl = safeText(providerData.paymentUrl, 2048);
     const statusMessage = safeText(providerData.statusMessage, 255);
 
-    if (!providerResponse.ok || statusCode !== "00" || !reference || !paymentUrl) {
+    if (
+      !providerResponse.ok || statusCode !== "00" || !reference || !paymentUrl
+    ) {
       await supabase.from("payment_transactions").update({
         status: "failed",
         provider_result_code: statusCode,
-        provider_result_message: statusMessage ?? `Duitku HTTP ${providerResponse.status}`,
-        response_snapshot: { statusCode, statusMessage, httpStatus: providerResponse.status },
+        provider_result_message: statusMessage ??
+          `Duitku HTTP ${providerResponse.status}`,
+        response_snapshot: {
+          statusCode,
+          statusMessage,
+          httpStatus: providerResponse.status,
+        },
         updated_at: new Date().toISOString(),
       }).eq("id", insertedPayment.id);
       return jsonResponse(502, { error: "duitku_invoice_rejected" });
@@ -277,7 +315,9 @@ Deno.serve(async (request) => {
     if (saveError) {
       // Provider may have created an invoice. Keep the row in its current state
       // and require manual/provider-side reconciliation; never fabricate success.
-      return jsonResponse(502, { error: "invoice_created_but_persistence_failed" });
+      return jsonResponse(502, {
+        error: "invoice_created_but_persistence_failed",
+      });
     }
 
     return jsonResponse(200, {

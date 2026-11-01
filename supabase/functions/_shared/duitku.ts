@@ -20,7 +20,10 @@ export function duitkuEndpoint(environment: DuitkuEnvironment): string {
     : "https://api-prod.duitku.com/api/merchant/createInvoice";
 }
 
-export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+export async function hmacSha256Hex(
+  secret: string,
+  message: string,
+): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -50,16 +53,25 @@ export function constantTimeEqual(left: string, right: string): boolean {
 }
 
 export async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
-export function jsonResponse(status: number, body: Record<string, unknown>): Response {
+export function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
   });
 }
 

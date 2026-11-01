@@ -9,7 +9,7 @@ create table if not exists public.orders (
   status text not null default 'pending_payment'
     check (status in ('pending_payment', 'confirmed', 'cancelled', 'payment_review')),
   payment_status text not null default 'pending'
-    check (payment_status in ('pending', 'paid', 'failed', 'expired', 'refunded')),
+    check (payment_status in ('pending', 'paid', 'failed', 'expired', 'refunded', 'review')),
   currency char(3) not null default 'IDR' check (currency = 'IDR'),
   customer_first_name text,
   customer_last_name text,
@@ -51,7 +51,7 @@ create table if not exists public.payment_transactions (
   provider text not null default 'duitku' check (provider = 'duitku'),
   environment text not null check (environment in ('sandbox', 'production')),
   status text not null default 'creating'
-    check (status in ('creating', 'pending', 'paid', 'failed', 'expired', 'refunded')),
+    check (status in ('creating', 'pending', 'paid', 'failed', 'expired', 'refunded', 'review')),
   amount bigint not null check (amount > 0),
   currency char(3) not null default 'IDR' check (currency = 'IDR'),
   provider_reference text unique,
@@ -108,6 +108,7 @@ create or replace function public.apply_duitku_callback(
   p_reference text,
   p_result_code text,
   p_payment_code text,
+  p_credit_card_payment_methods text[],
   p_safe_payload jsonb
 )
 returns jsonb
@@ -162,7 +163,6 @@ begin
        set status = 'paid',
            provider_reference = coalesce(provider_reference, p_reference),
            provider_result_code = p_result_code,
-           payment_method = coalesce(p_payment_code, payment_method),
            paid_at = coalesce(paid_at, now()),
            updated_at = now()
      where id = v_payment.id
@@ -174,23 +174,26 @@ begin
            updated_at = now()
      where id = v_payment.order_id
        and payment_status <> 'paid';
-  else
+  elsif p_result_code = '01'
+        and v_payment.payment_method is not null
+        and v_payment.payment_method = any(coalesce(p_credit_card_payment_methods, array[]::text[])) then
     v_new_status := 'failed';
-    -- A later verified success may supersede a previous failure, but a failure
-    -- callback must never move an already-paid transaction backwards.
     update public.payment_transactions
-       set status = 'failed',
-           provider_result_code = p_result_code,
-           payment_method = coalesce(p_payment_code, payment_method),
-           updated_at = now()
-     where id = v_payment.id
-       and status in ('creating', 'pending');
-
+       set status = 'failed', provider_result_code = p_result_code, updated_at = now()
+     where id = v_payment.id and status in ('creating', 'pending');
     update public.orders
-       set payment_status = 'failed',
+       set payment_status = 'failed', updated_at = now()
+     where id = v_payment.order_id and payment_status = 'pending';
+  else
+    v_new_status := 'review';
+    update public.payment_transactions
+       set status = 'review', provider_result_code = p_result_code, updated_at = now()
+     where id = v_payment.id and status in ('creating', 'pending');
+    update public.orders
+       set payment_status = 'review',
+           status = case when status = 'cancelled' then status else 'payment_review' end,
            updated_at = now()
-     where id = v_payment.order_id
-       and payment_status = 'pending';
+     where id = v_payment.order_id and payment_status = 'pending';
   end if;
 
   update public.payment_callback_events
@@ -207,7 +210,7 @@ end;
 $$;
 
 revoke all on function public.apply_duitku_callback(
-  text, text, bigint, text, text, text, text, jsonb
+  text, text, bigint, text, text, text, text, text[], jsonb
 ) from public, anon, authenticated;
 grant execute on function public.apply_duitku_callback(
   text, text, bigint, text, text, text, text, jsonb

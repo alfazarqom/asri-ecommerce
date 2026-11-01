@@ -59,6 +59,9 @@ Deno.serve(async (request) => {
     const environment = duitkuEnvironment();
     const callbackUrl = requiredEnv("DUITKU_CALLBACK_URL");
     const returnUrl = requiredEnv("DUITKU_RETURN_URL");
+    if (new URL(callbackUrl).protocol !== "https:" || new URL(returnUrl).protocol !== "https:") {
+      throw new Error("Duitku callback and return URLs must use HTTPS");
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },

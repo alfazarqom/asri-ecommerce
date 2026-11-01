@@ -1,0 +1,9 @@
+project_id = "asri-ecommerce"
+
+[functions.duitku-create-invoice]
+# Protected by DUITKU_INTERNAL_API_SECRET because this endpoint is server-to-server.
+verify_jwt = false
+
+[functions.duitku-callback]
+# Duitku authenticates callbacks with the documented HMAC signature.
+verify_jwt = false

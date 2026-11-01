@@ -95,6 +95,7 @@ The POP page specifies the callback POST format and signature but does not clear
 - The schema is a new baseline, not reconciled against a live Supabase schema. Review for naming conflicts before applying.
 - No stock decrement/reservation, expiry worker, cancellation, refund execution, reconciliation/inquiry endpoint, rate limiter, or guest order tracking is included.
 - The POP documentation's callback examples show differing non-success result-code examples in different places. Only `00` is treated as success; confirm all other result codes with Duitku.
+- The documented callback HMAC covers `merchantCode + amount + merchantOrderId`; it does not cover `resultCode` or `reference`. HTTPS is required for callback/return URLs, but this signature limitation should be confirmed with Duitku merchant support before production. The POP page inspected here does not document a status-inquiry endpoint, so independent provider-side reconciliation remains an operational prerequisite for suspicious or disputed callbacks.
 - Sandbox credentials, merchant configuration, callback delivery, and provider behavior have not been tested.
 - The migration has not been executed. Functions have not been deployed.
 

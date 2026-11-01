@@ -1,6 +1,6 @@
 {
   "name": "ASRI Collection Design System",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "description": "Modern, minimal, premium ecommerce storefront design system",
   "framework": {
     "library": "React",
@@ -257,6 +257,29 @@
     },
     "sections": {
       "verticalSpacing": "24px"
+    },
+    "standalonePage": {
+      "display": "flex",
+      "flexDirection": "column",
+      "flex": "1 1 0%",
+      "minHeight": "0",
+      "minWidth": "0"
+    },
+    "standaloneContent": {
+      "display": "flex",
+      "flexDirection": "column",
+      "flex": "1 1 0%",
+      "minHeight": "0",
+      "minWidth": "0",
+      "overflowY": "auto",
+      "overflowX": "hidden",
+      "overscrollBehaviorY": "contain",
+      "webkitOverflowScrolling": "touch"
+    },
+    "bottomActionBar": {
+      "position": "static",
+      "flexShrink": "0",
+      "width": "100%"
     }
   },
   "radius": {
@@ -363,6 +386,18 @@
     "toast": {
       "position": "top",
       "duration": "200ms"
+    },
+    "bottomActionBar": {
+      "background": "colors.surface.DEFAULT",
+      "borderTop": "colors.border.DEFAULT",
+      "width": "100%",
+      "responsive": true,
+      "content": {
+        "alignment": "horizontal",
+        "primaryAction": true,
+        "secondaryAction": true,
+        "minimumTouchTarget": "44px"
+      }
     }
   },
   "interaction": {
@@ -450,5 +485,12 @@
     "spacingSource": "spacing.scale",
     "radiusSource": "radius",
     "shadowSource": "shadows"
+  },
+  "safeArea": {
+    "enabled": true,
+    "bottomActionBar": {
+      "paddingBottom": "env(safe-area-inset-bottom, 0px)",
+      "boxSizing": "border-box"
+    }
   }
 }

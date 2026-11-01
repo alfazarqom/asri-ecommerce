@@ -1,0 +1,31 @@
+{
+  "App": {
+    "AppShell": {
+      "Header": {},
+      "Main": {
+        "HomePage": {},
+        "ProductPage": {
+          "Categories": {}
+        }
+      }
+    },
+    "Standalone": {
+      "Layout": {
+        "Content": {},
+        "BottomActionBar": {}
+      },
+      "ProductDetailPage": {},
+      "CartPage": {},
+      "CheckoutPage": {},
+      "PaymentReturnPage": {},
+      "OrderDetailPage": {},
+      "OrderTrackingPage": {}
+    },
+    "Overlays": {
+      "Modal": {},
+      "BottomDrawer": {},
+      "QuickView": {},
+      "Toast": {}
+    }
+  }
+}

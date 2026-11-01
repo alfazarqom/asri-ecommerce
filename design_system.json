@@ -1,6 +1,6 @@
 {
   "name": "ASRI Collection Design System",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Modern, minimal, premium ecommerce storefront design system",
   "framework": {
     "library": "React",
@@ -257,6 +257,28 @@
     },
     "sections": {
       "verticalSpacing": "24px"
+    },
+    "standalonePage": {
+      "display": "flex",
+      "flexDirection": "column",
+      "flex": "1 1 0%",
+      "minHeight": "0",
+      "minWidth": "0"
+    },
+    "standaloneContent": {
+      "display": "flex",
+      "flexDirection": "column",
+      "flex": "1 1 0%",
+      "minHeight": "0",
+      "minWidth": "0",
+      "overflowY": "auto",
+      "overflowX": "hidden",
+      "overscrollBehaviorY": "contain",
+      "webkitOverflowScrolling": "touch"
+    },
+    "bottomActionBar": {
+      "position": "static",
+      "flexShrink": "0"
     }
   },
   "radius": {
@@ -363,6 +385,18 @@
     "toast": {
       "position": "top",
       "duration": "200ms"
+    },
+    "bottomActionBar": {
+      "position": "static",
+      "flexShrink": "0",
+      "background": "colors.surface.DEFAULT",
+      "borderTop": "colors.border.DEFAULT",
+      "responsive": true,
+      "content": {
+        "alignment": "horizontal",
+        "primaryAction": true,
+        "secondaryAction": true
+      }
     }
   },
   "interaction": {

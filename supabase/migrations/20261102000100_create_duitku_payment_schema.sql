@@ -146,7 +146,7 @@ begin
     from public.payment_transactions
    where provider = 'duitku'
      and merchant_order_id = p_merchant_order_id
-     and (provider_reference = p_reference or provider_reference is null)
+     and provider_reference = p_reference
    for update;
 
   if not found then
@@ -161,7 +161,6 @@ begin
     v_new_status := 'paid';
     update public.payment_transactions
        set status = 'paid',
-           provider_reference = coalesce(provider_reference, p_reference),
            provider_result_code = p_result_code,
            paid_at = coalesce(paid_at, now()),
            updated_at = now()

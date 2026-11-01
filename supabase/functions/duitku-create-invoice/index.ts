@@ -152,6 +152,7 @@ Deno.serve(async (request) => {
         status: "creating",
         amount: typedOrder.total_amount,
         currency: "IDR",
+        payment_method: safeText(Deno.env.get("DUITKU_PAYMENT_METHOD"), 10),
         request_snapshot: { paymentAmount: typedOrder.total_amount, itemCount: itemDetails.length },
       })
       .select("id")

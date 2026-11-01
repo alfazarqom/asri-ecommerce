@@ -30,6 +30,7 @@ Configure these in Supabase Edge Function secrets; never commit their values:
 Optional:
 - `DUITKU_PAYMENT_METHOD`: fixed payment method code, if the merchant intentionally restricts channels.
 - `DUITKU_EXPIRY_PERIOD`: positive integer in minutes; omitted if unset. Confirm the merchant's intended expiry with Duitku before configuring it.
+- `DUITKU_CREDIT_CARD_PAYMENT_METHODS`: comma-separated exact payment method codes configured as credit-card channels; required to classify callback `01` as failed. Leave unset to route `01` to manual review.
 
 ## Database contract
 
@@ -84,7 +85,7 @@ stringToSign = merchantCode + amount + merchantOrderId
 signature = HMAC_SHA256(stringToSign, apiKey)
 ```
 
-It then matches merchant order ID, amount, and Duitku `reference` against the persisted pending payment and invokes `apply_duitku_callback`. The database function locks the payment row and processes each callback event key once. Only `resultCode = 00` is mapped to paid; non-success result codes are recorded as failed while a paid transaction cannot be moved backwards by a later failure callback. A verified success arriving after an order was cancelled changes its order status to `payment_review` so it cannot silently enter fulfillment.
+It then matches merchant order ID, amount, and Duitku `reference` against the persisted pending payment and invokes `apply_duitku_callback`. The database function locks the payment row and processes each callback event key once. `resultCode = 00` is mapped to paid. Based on the merchant clarification, `01` is classified as failed only when the saved invoice payment method matches the configured `DUITKU_CREDIT_CARD_PAYMENT_METHODS` allowlist. Any unexpected `01` on another channel, or any unrecognized non-success code, is placed in `review` for manual reconciliation rather than being assumed failed. Callback `paymentCode` is not treated as the payment-method identifier. A verified success arriving after an order was cancelled changes its order status to `payment_review` so it cannot silently enter fulfillment.
 
 The POP page specifies the callback POST format and signature but does not clearly prescribe an acknowledgment response body. This implementation returns HTTP 200 `OK` only after the database transaction commits and HTTP 500 for transient processing failures. Confirm retry/acknowledgment expectations with Duitku merchant support before production.
 
@@ -94,7 +95,7 @@ The POP page specifies the callback POST format and signature but does not clear
 - No frontend caller exists yet. The internal invoice endpoint must be invoked server-to-server.
 - The schema is a new baseline, not reconciled against a live Supabase schema. Review for naming conflicts before applying.
 - No stock decrement/reservation, expiry worker, cancellation, refund execution, reconciliation/inquiry endpoint, rate limiter, or guest order tracking is included.
-- The POP documentation's callback examples show differing non-success result-code examples in different places. Only `00` is treated as success; confirm all other result codes with Duitku.
+- The merchant clarified that current callback outcomes are `00` and `01`, with `01` available only for credit-card transactions; other channels send `00` for successful transactions. This implementation follows that rule and quarantines unexpected codes for review.
 - The documented callback HMAC covers `merchantCode + amount + merchantOrderId`; it does not cover `resultCode` or `reference`. HTTPS is required for callback/return URLs, but this signature limitation should be confirmed with Duitku merchant support before production. The POP page inspected here does not document a status-inquiry endpoint, so independent provider-side reconciliation remains an operational prerequisite for suspicious or disputed callbacks.
 - Sandbox credentials, merchant configuration, callback delivery, and provider behavior have not been tested.
 - The migration has not been executed. Functions have not been deployed.

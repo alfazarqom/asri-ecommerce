@@ -1,0 +1,281 @@
+``{
+  "name": "ASRI Collection Design System",
+  "version": "1.0.0",
+  "description": "Modern minimal premium ecommerce storefront design system",
+  "framework": {
+    "library": "React",
+    "language": "TypeScript",
+    "bundler": "Vite",
+    "styling": "Tailwind CSS",
+    "icons": "lucide-react"
+  },
+  "brand": {
+    "name": "ASRI Collection",
+    "tagline": "Tampil Elegan, Setiap Hari"
+  },
+  "designPrinciples": [
+    "Modern",
+    "Minimal",
+    "Premium",
+    "Clean",
+    "Elegant",
+    "Trustworthy",
+    "MobileFirst"
+  ],
+  "platform": {
+    "type": "ecommerce-storefront",
+    "layout": "mobile-first",
+    "responsivePriority": "mobile",
+    "checkout": "guest-checkout",
+    "authentication": false
+  },
+  "colors": {
+    "primary": {
+      "DEFAULT": "#16803D",
+      "hover": "#146C35",
+      "active": "#115C2E",
+      "light": "#DCFCE7",
+      "foreground": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#F15A24",
+      "hover": "#DC4B1B",
+      "light": "#FFF0E9",
+      "foreground": "#FFFFFF"
+    },
+    "background": {
+      "DEFAULT": "#F8FAFC",
+      "subtle": "#F1F5F9"
+    },
+    "surface": {
+      "DEFAULT": "#FFFFFF",
+      "elevated": "#FFFFFF",
+      "muted": "#F8FAFC"
+    },
+    "text": {
+      "primary": "#171A21",
+      "secondary": "#64748B",
+      "muted": "#94A3B8",
+      "inverse": "#FFFFFF"
+    },
+    "border": {
+      "DEFAULT": "#E5E7EB",
+      "strong": "#CBD5E1",
+      "focus": "#16803D"
+    },
+    "status": {
+      "success": "#16A34A",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "primary": "Inter",
+      "fallback": [
+        "system-ui",
+        "-apple-system",
+        "sans-serif"
+      ]
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "scale": {
+      "display": {
+        "size": 30,
+        "lineHeight": 38,
+        "weight": 700
+      },
+      "h1": {
+        "size": 24,
+        "lineHeight": 32,
+        "weight": 700
+      },
+      "h2": {
+        "size": 20,
+        "lineHeight": 28,
+        "weight": 600
+      },
+      "h3": {
+        "size": 18,
+        "lineHeight": 26,
+        "weight": 600
+      },
+      "body": {
+        "size": 14,
+        "lineHeight": 22,
+        "weight": 400
+      },
+      "small": {
+        "size": 12,
+        "lineHeight": 18,
+        "weight": 400
+      },
+      "caption": {
+        "size": 11,
+        "lineHeight": 16,
+        "weight": 400
+      }
+    }
+  },
+  "spacing": {
+    "unit": 4,
+    "scale": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "base": 16,
+      "lg": 20,
+      "xl": 24,
+      "2xl": 32,
+      "3xl": 40,
+      "4xl": 48
+    }
+  },
+  "layout": {
+    "container": {
+      "width": "100%",
+      "paddingHorizontal": 16
+    },
+    "grid": {
+      "columns": 2,
+      "gap": 12
+    },
+    "productImage": {
+      "aspectRatio": "1:1",
+      "objectFit": "cover"
+    },
+    "sections": {
+      "verticalSpacing": 24
+    }
+  },
+  "radius": {
+    "none": 0,
+    "sm": 6,
+    "md": 10,
+    "button": 12,
+    "card": 14,
+    "lg": 16,
+    "xl": 20,
+    "full": 9999
+  },
+  "shadows": {
+    "none": "none",
+    "sm": "0 1px 2px rgba(0,0,0,0.05)",
+    "md": "0 4px 12px rgba(0,0,0,0.06)",
+    "lg": "0 8px 24px rgba(0,0,0,0.08)"
+  },
+  "components": {
+    "header": {
+      "height": 56,
+      "background": "#FFFFFF",
+      "position": "sticky"
+    },
+    "searchBar": {
+      "height": 44,
+      "radius": 10,
+      "background": "#F1F5F9"
+    },
+    "button": {
+      "height": 44,
+      "radius": 12,
+      "fontSize": 14,
+      "fontWeight": 600
+    },
+    "productCard": {
+      "background": "#FFFFFF",
+      "radius": 14,
+      "imageRatio": "1:1",
+      "imagePosition": "top",
+      "showName": true,
+      "showPrice": true,
+      "showDiscount": true,
+      "showWishlist": true
+    },
+    "categoryItem": {
+      "imageRatio": "1:1",
+      "radius": 12
+    },
+    "bottomNavigation": {
+      "height": 64,
+      "position": "fixed",
+      "background": "#FFFFFF"
+    },
+    "bottomDrawer": {
+      "radiusTop": 20,
+      "background": "#FFFFFF"
+    },
+    "modal": {
+      "radius": 16,
+      "background": "#FFFFFF"
+    },
+    "badge": {
+      "radius": 6,
+      "fontSize": 11
+    }
+  },
+  "interaction": {
+    "touchTarget": {
+      "minimumWidth": 44,
+      "minimumHeight": 44
+    },
+    "focusRing": {
+      "color": "#16803D",
+      "width": 2
+    },
+    "transition": {
+      "duration": "200ms",
+      "easing": "ease-in-out"
+    },
+    "reducedMotion": true
+  },
+  "states": {
+    "default": true,
+    "hover": true,
+    "active": true,
+    "focus": true,
+    "disabled": true,
+    "loading": true,
+    "error": true,
+    "empty": true,
+    "success": true
+  },
+  "loading": {
+    "strategy": "skeleton",
+    "showDummyProducts": false,
+    "skeletonAnimation": "pulse"
+  },
+  "accessibility": {
+    "semanticHTML": true,
+    "keyboardNavigation": true,
+    "visibleFocus": true,
+    "minimumTouchTarget": 44,
+    "respectReducedMotion": true
+  },
+  "icons": {
+    "library": "lucide-react",
+    "strokeWidth": 1.8,
+    "style": "outline"
+  },
+  "imagery": {
+    "style": "clean-product-photography",
+    "productAspectRatio": "1:1",
+    "objectFit": "cover",
+    "background": "#F8FAFC"
+  },
+  "tailwind": {
+    "primary": "#16803D",
+    "secondary": "#F15A24",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "text": "#171A21",
+    "muted": "#64748B",
+    "border": "#E5E7EB"
+  }
+}
+``

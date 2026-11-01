@@ -75,6 +75,9 @@ Deno.serve(async (request) => {
       paymentCode ?? "",
     ].join("|"));
 
+    const creditCardMethods = (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
+      .split(",").map((value) => value.trim()).filter(Boolean);
+
     const supabase = createClient(
       requiredEnv("SUPABASE_URL"),
       requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
@@ -89,6 +92,7 @@ Deno.serve(async (request) => {
       p_reference: reference,
       p_result_code: resultCode,
       p_payment_code: paymentCode,
+      p_credit_card_payment_methods: creditCardMethods,
       p_safe_payload: safePayload,
     });
 

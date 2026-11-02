@@ -197,7 +197,7 @@ begin
   end if;
 
   v_total := v_subtotal + v_shipping;
-  v_merchant_order_id := 'ASRI-' || upper(encode(gen_random_bytes(16), 'hex'));
+  v_merchant_order_id := 'ASRI-' || upper(replace(gen_random_uuid()::text, '-', ''));
 
   insert into public.orders (
     merchant_order_id, status, payment_status, currency,
@@ -411,7 +411,10 @@ declare
   v_stock_available boolean := true;
 begin
   if p_event_key is null or length(p_event_key) <> 64
-     or p_merchant_code is null or p_merchant_order_id is null
+     or p_merchant_code is null or length(trim(p_merchant_code)) < 1
+     or length(trim(p_merchant_code)) > 32
+     or coalesce(cardinality(p_credit_card_payment_methods), 0) > 100
+     or p_merchant_order_id is null
      or p_reference is null or p_amount is null or p_amount <= 0
      or p_result_code is null then
     raise exception 'Invalid callback arguments' using errcode = '22023';

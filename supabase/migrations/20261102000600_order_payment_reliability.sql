@@ -455,7 +455,48 @@ begin
   end if;
 
   if p_result_code = '00' then
-    if v_order.stock_released_at is not null
+    if v_payment.status = 'refunded'
+       or v_order.payment_status = 'refunded' then
+      v_new_status := 'review';
+      insert into public.payment_reconciliation_cases (
+        order_id, merchant_order_id, case_type, details
+      ) values (
+        v_order.id,
+        v_order.merchant_order_id,
+        'manual_review',
+        jsonb_build_object(
+          'reason', 'provider_success_callback_received_after_local_refund'
+        )
+      )
+      on conflict (order_id, case_type, status) do nothing;
+    elsif exists (
+      select 1
+        from public.payment_reconciliation_cases
+       where order_id = v_order.id
+         and case_type = 'stock_restore_failed'
+         and status = 'open'
+    ) then
+      -- A missing product row prevented stock restoration. Do not confirm
+      -- fulfillment even if the provider later verifies payment success.
+      v_new_status := 'review';
+      update public.orders
+         set status = 'payment_review',
+             payment_status = 'review',
+             updated_at = now()
+       where id = v_order.id;
+
+      insert into public.payment_reconciliation_cases (
+        order_id, merchant_order_id, case_type, details
+      ) values (
+        v_order.id,
+        v_order.merchant_order_id,
+        'manual_review',
+        jsonb_build_object(
+          'reason', 'verified_payment_received_after_stock_restore_failure'
+        )
+      )
+      on conflict (order_id, case_type, status) do nothing;
+    elsif v_order.stock_released_at is not null
        and v_order.stock_re_reserved_at is null then
       -- Validate all stock before decrementing any item.
       for v_item in

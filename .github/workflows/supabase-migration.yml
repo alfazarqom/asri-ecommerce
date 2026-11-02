@@ -33,6 +33,9 @@ jobs:
       - name: Apply all migrations to a clean local database
         run: supabase db reset --local
 
+      - name: Run Requirement V1 lifecycle integration tests
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/requirement-v1.sql
+
       - name: Lint local database schema
         run: supabase db lint --local
 

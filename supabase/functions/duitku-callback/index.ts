@@ -61,7 +61,7 @@ Deno.serve(async (request) => {
       return new Response("Bad Request", { status: 400 });
     }
 
-    const safePayload = {
+    const safePayload: Record<string, unknown> = {
       merchantCode,
       amount: amountText,
       merchantOrderId,

@@ -167,10 +167,6 @@ Deno.serve(async (request) => {
       merchantOrderId,
       verifiedStatusCode,
     ].join("|"));
-    const creditCardMethods =
-      (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
-        .split(",").map((value) => value.trim()).filter(Boolean);
-
     safePayload.verifiedStatusCode = verifiedStatusCode;
 
     const { data, error } = await supabase.rpc("apply_duitku_callback", {
@@ -181,7 +177,7 @@ Deno.serve(async (request) => {
       p_reference: reference,
       p_result_code: verifiedStatusCode,
       p_payment_code: paymentCode,
-      p_credit_card_payment_methods: creditCardMethods,
+      p_credit_card_payment_methods: [],
       p_safe_payload: safePayload,
     });
 

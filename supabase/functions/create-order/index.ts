@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { sha256Hex } from "../_shared/duitku.ts";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -84,6 +85,27 @@ Deno.serve(async (request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const clientIp = request.headers.get("cf-connecting-ip")?.trim() ||
+      (forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(-1) : "");
+    if (!clientIp) {
+      return response(400, { error: "client_ip_unavailable" });
+    }
+    const { data: rateAllowed, error: rateError } = await supabase.rpc(
+      "consume_asri_rate_limit",
+      {
+        p_key_hash: await sha256Hex("create-order|" + clientIp),
+        p_max_requests: 5,
+        p_window_seconds: 60,
+      },
+    );
+    if (rateError) {
+      return response(503, { error: "rate_limit_unavailable" });
+    }
+    if (rateAllowed !== true) {
+      return response(429, { error: "rate_limit_exceeded" });
+    }
+
     const shippingAddress = {
       address,
       recipientName: firstName,

@@ -25,13 +25,13 @@ export const useStore = create<Store>((set) => ({
   setProductsLoading: (value) => set({ productsLoading: value }),
   setProductsError: (value) => set({ productsLoading: false, productsError: value }),
   addToCart: (product, quantity = 1) => set(state => {
-    if (!product.availability || product.stock <= 0) return state;
+    if (!product.availability || product.stock === 0) return state;
     const existing = state.cart.find(line => line.product.id === product.id);
-    if (existing) return { cart: state.cart.map(line => line.product.id === product.id ? { ...line, quantity: Math.min(line.quantity + quantity, product.stock) } : line) };
-    return { cart: [...state.cart, { product, quantity: Math.min(quantity, product.stock) }] };
+    if (existing) return { cart: state.cart.map(line => line.product.id === product.id ? { ...line, quantity: product.stock === null ? line.quantity + quantity : Math.min(line.quantity + quantity, product.stock) } : line) };
+    return { cart: [...state.cart, { product, quantity: product.stock === null ? quantity : Math.min(quantity, product.stock) }] };
   }),
   updateQuantity: (id, quantity) => set(state => ({
-    cart: quantity <= 0 ? state.cart.filter(line => line.product.id !== id) : state.cart.map(line => line.product.id === id ? { ...line, quantity: Math.min(quantity, line.product.stock) } : line)
+    cart: quantity <= 0 ? state.cart.filter(line => line.product.id !== id) : state.cart.map(line => line.product.id === id ? { ...line, quantity: line.product.stock === null ? quantity : Math.min(quantity, line.product.stock) } : line)
   })),
   removeFromCart: (id) => set(state => ({ cart: state.cart.filter(line => line.product.id !== id) })),
   toggleWishlist: (id) => set(state => ({ wishlist: state.wishlist.includes(id) ? state.wishlist.filter(item => item !== id) : [...state.wishlist, id] })),

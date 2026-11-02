@@ -26,26 +26,33 @@ const imageList = (value: unknown): string[] => {
 export function normalizeProduct(input: unknown): Product {
   const row = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const id = stringValue(first(row, ["id", "product_id", "uuid", "sku"]), crypto.randomUUID());
-  const name = stringValue(first(row, ["name", "product_name", "title", "nama_produk"]), "Produk");
-  const price = numberValue(first(row, ["price", "selling_price", "harga"]), 0);
-  const originalPrice = numberValue(first(row, ["original_price", "compare_at_price", "regular_price", "harga_asli"]), 0);
-  const image = stringValue(first(row, ["image_url", "image", "thumbnail", "main_image", "image_link", "photo", "product_image"]));
+  const name = stringValue(first(row, ["title", "name", "product_name", "nama_produk"]), "Produk");
+  const basePrice = numberValue(first(row, ["price", "selling_price", "harga"]), 0);
+  const salePrice = numberValue(first(row, ["sale_price"]), 0);
+  const price = salePrice > 0 && salePrice < basePrice ? salePrice : basePrice;
+  const explicitOriginal = numberValue(first(row, ["original_price", "compare_at_price", "regular_price", "harga_asli"]), 0);
+  const originalPrice = salePrice > 0 && salePrice < basePrice ? basePrice : explicitOriginal > price ? explicitOriginal : undefined;
+  const rawDiscount = numberValue(first(row, ["discount_percentage", "discount"]), 0);
+  const discountPercentage = rawDiscount > 0 ? rawDiscount : originalPrice ? Math.round((1 - price / originalPrice) * 100) : undefined;
+  const image = stringValue(first(row, ["image_link", "image_url", "image", "thumbnail", "main_image", "photo", "product_image"]));
   const extras = imageList(first(row, ["additional_image_link", "images", "image_urls", "gallery"]));
   const images = [...new Set([image, ...extras].filter(Boolean))];
-  const availabilityValue = first(row, ["availability", "is_available", "available", "status"]);
-  const availability = typeof availabilityValue === "boolean"
-    ? availabilityValue
-    : ["in stock", "available", "active", "true", "1"].includes(stringValue(availabilityValue, "available").toLowerCase());
-  const stock = numberValue(first(row, ["stock", "quantity", "stock_quantity", "inventory"]), 0);
-  const discount = numberValue(first(row, ["discount_percentage", "discount"]), 0);
+  const availabilityStatus = stringValue(first(row, ["availability", "is_available", "available", "status"]), "in stock").toLowerCase();
+  const availability = ["in stock", "preorder", "available for order", "available", "active", "true", "1"].includes(availabilityStatus);
+  const availabilityLabels: Record<string, string> = {
+    "in stock": "Tersedia", preorder: "Preorder", "available for order": "Dapat dipesan",
+    available: "Tersedia", active: "Tersedia", "out of stock": "Habis", discontinued: "Tidak tersedia"
+  };
+  const inventoryValue = first(row, ["inventory", "stock", "quantity", "stock_quantity"]);
+  const stock = inventoryValue === undefined ? null : numberValue(inventoryValue, 0);
   const slug = stringValue(first(row, ["slug"]), name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
   return {
     id, name, slug, description: stringValue(first(row, ["description", "short_description", "detail"])),
-    price, originalPrice: originalPrice > price ? originalPrice : undefined,
-    discountPercentage: discount > 0 ? discount : undefined,
+    price, originalPrice, discountPercentage,
     image: images[0], images,
-    category: stringValue(first(row, ["category", "category_name", "product_type", "type"]), "Koleksi"),
-    availability, stock, sku: stringValue(row.sku), raw: row
+    category: stringValue(first(row, ["product_type", "category", "category_name", "type"]), "Koleksi"),
+    availability, availabilityLabel: availabilityLabels[availabilityStatus] || availabilityStatus,
+    stock, sku: stringValue(row.sku), raw: row
   };
 }
 

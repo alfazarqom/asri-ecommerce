@@ -7,6 +7,7 @@ import { useStore } from "../store/useStore";
 export function ProductCard({ product }: { product: Product }) {
   const { wishlist, toggleWishlist, addToCart, notify } = useStore();
   const saved = wishlist.includes(product.id);
+  const canPurchase = product.availability && product.stock !== 0;
   return <article className="product-card">
     <div className="product-image-wrap">
       <Link to={`/product/${product.id}`} aria-label={`Lihat ${product.name}`}>
@@ -20,8 +21,8 @@ export function ProductCard({ product }: { product: Product }) {
       <Link className="product-name" to={`/product/${product.id}`}>{product.name}</Link>
       <div className="price-row"><strong>{formatRupiah(product.price)}</strong>{product.originalPrice ? <del>{formatRupiah(product.originalPrice)}</del> : null}</div>
       <div className="product-card-footer">
-        <span className={product.availability && product.stock > 0 ? "stock-ok" : "stock-out"}>{product.availability && product.stock > 0 ? "Tersedia" : "Habis"}</span>
-        <button className="quick-add" disabled={!product.availability || product.stock <= 0} onClick={() => { addToCart(product); notify("Ditambahkan ke keranjang"); }} aria-label={`Tambah ${product.name} ke keranjang`}><ShoppingBag size={16} /></button>
+        <span className={canPurchase ? "stock-ok" : "stock-out"}>{product.availabilityLabel}{product.stock !== null ? ` · Stok ${product.stock}` : ""}</span>
+        <button className="quick-add" disabled={!canPurchase} onClick={() => { addToCart(product); notify("Ditambahkan ke keranjang"); }} aria-label={`Tambah ${product.name} ke keranjang`}><ShoppingBag size={16} /></button>
       </div>
     </div>
   </article>;

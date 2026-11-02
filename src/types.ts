@@ -10,7 +10,8 @@ export interface Product {
   images: string[];
   category?: string;
   availability: boolean;
-  stock: number;
+  availabilityLabel: string;
+  stock: number | null;
   sku?: string;
   raw: Record<string, unknown>;
 }

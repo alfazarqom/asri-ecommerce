@@ -15,3 +15,7 @@ verify_jwt = false
 [functions.create-order]
 # Public guest checkout endpoint; gateway validates the Supabase anon JWT.
 verify_jwt = true
+
+[functions.create-payment]
+# Public gateway-verified guest payment initiation; privileged call uses an internal server secret.
+verify_jwt = true

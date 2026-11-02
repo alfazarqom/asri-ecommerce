@@ -245,6 +245,8 @@
       "flexShrink": "0"
     },
     "bottomNavigation": {
+      "flexShrink": "0",
+      "position": "static",
       "safeAreaBottom": "env(safe-area-inset-bottom, 0px)",
       "boxSizing": "border-box"
     },

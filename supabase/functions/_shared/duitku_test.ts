@@ -14,16 +14,18 @@ Deno.test("email validator accepts valid customer addresses", () => {
 });
 
 Deno.test("email validator rejects malformed or oversized values", () => {
-  for (const value of [
-    "",
-    "buyer",
-    "buyer@",
-    "@example.com",
-    "buyer@example",
-    "buyer @example.com",
-    "buyer@example.com ",
-    "a".repeat(256) + "@example.com",
-  ]) {
+  for (
+    const value of [
+      "",
+      "buyer",
+      "buyer@",
+      "@example.com",
+      "buyer@example",
+      "buyer @example.com",
+      "buyer@example.com ",
+      "a".repeat(256) + "@example.com",
+    ]
+  ) {
     if (isValidEmail(value)) {
       throw new Error(`Expected invalid email to fail: ${value}`);
     }
@@ -46,12 +48,14 @@ Deno.test("transaction status response must match order, reference, amount and s
     throw new Error("Expected matching provider status to pass");
   }
 
-  for (const altered of [
-    { ...valid, merchantOrderId: "other-order" },
-    { ...valid, reference: "other-reference" },
-    { ...valid, amount: "150001" },
-    { ...valid, statusCode: "99" },
-  ]) {
+  for (
+    const altered of [
+      { ...valid, merchantOrderId: "other-order" },
+      { ...valid, reference: "other-reference" },
+      { ...valid, amount: "150001" },
+      { ...valid, statusCode: "99" },
+    ]
+  ) {
     if (isVerifiedTransactionStatus(altered, expected)) {
       throw new Error("Expected mismatched provider status to fail");
     }

@@ -39,7 +39,9 @@ Deno.serve(async (request) => {
     const forwardedFor = request.headers.get("x-forwarded-for");
     const clientIp = request.headers.get("cf-connecting-ip")?.trim() ||
       (forwardedFor
-        ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(-1)
+        ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(
+          -1,
+        )
         : "");
     if (!clientIp) {
       return jsonResponse(400, { error: "client_ip_unavailable" });
@@ -56,7 +58,9 @@ Deno.serve(async (request) => {
 
     const rateKeys = [
       await sha256Hex("order-tracking-ip|" + clientIp),
-      await sha256Hex("order-tracking-order|" + clientIp + "|" + merchantOrderId),
+      await sha256Hex(
+        "order-tracking-order|" + clientIp + "|" + merchantOrderId,
+      ),
     ];
     const limits = [20, 5];
     for (let index = 0; index < rateKeys.length; index++) {
@@ -78,7 +82,9 @@ Deno.serve(async (request) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, merchant_order_id, status, payment_status, total_amount, created_at, expires_at")
+      .select(
+        "id, merchant_order_id, status, payment_status, total_amount, created_at, expires_at",
+      )
       .eq("merchant_order_id", merchantOrderId)
       .maybeSingle();
 

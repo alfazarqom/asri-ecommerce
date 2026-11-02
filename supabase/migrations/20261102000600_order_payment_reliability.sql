@@ -621,7 +621,8 @@ as $$
 declare
   v_case public.payment_reconciliation_cases%rowtype;
 begin
-  if p_case_id is null or p_resolution not in ('refunded', 'resolved') then
+  if p_case_id is null or p_resolution is null
+     or p_resolution not in ('refunded', 'resolved') then
     raise exception 'Invalid reconciliation resolution' using errcode = '22023';
   end if;
 

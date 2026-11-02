@@ -1,0 +1,33 @@
+name: Expire Unpaid Orders
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: expire-unpaid-orders
+  cancel-in-progress: false
+
+jobs:
+  expire:
+    name: Invoke secured expiry worker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke expiry worker when deployment secrets are configured
+        env:
+          WORKER_URL: ${{ secrets.ASRI_EXPIRY_WORKER_URL }}
+          WORKER_SECRET: ${{ secrets.ASRI_EXPIRY_WORKER_SECRET }}
+        run: |
+          if [ -z "$WORKER_URL" ] || [ -z "$WORKER_SECRET" ]; then
+            echo "::notice::Expiry worker secrets are not configured; no request was sent."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error \
+            --request POST "$WORKER_URL" \
+            --header "content-type: application/json" \
+            --header "x-internal-secret: $WORKER_SECRET" \
+            --data '{}'

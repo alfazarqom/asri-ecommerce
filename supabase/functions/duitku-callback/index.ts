@@ -165,6 +165,7 @@ Deno.serve(async (request) => {
       merchantCode,
       amountText,
       merchantOrderId,
+      reference,
       verifiedStatusCode,
     ].join("|"));
     safePayload.verifiedStatusCode = verifiedStatusCode;

@@ -32,7 +32,7 @@ Deno.serve(async (request) => {
     const merchantOrderId = typeof body.merchant_order_id === "string"
       ? body.merchant_order_id.trim()
       : "";
-    if (!/^ASRI-[A-Z0-9-]{12,40}$/.test(merchantOrderId)) {
+    if (!/^ASRI-[A-F0-9]{32}$/.test(merchantOrderId)) {
       return jsonResponse(400, { error: "invalid_merchant_order_id" });
     }
 

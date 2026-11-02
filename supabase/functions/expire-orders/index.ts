@@ -1,8 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import {
-  constantTimeEqual,
-  requiredEnv,
-} from "../_shared/duitku.ts";
+import { constantTimeEqual, requiredEnv } from "../_shared/duitku.ts";
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {

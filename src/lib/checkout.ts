@@ -76,3 +76,39 @@ export async function createPayment(merchantOrderId: string): Promise<CreatedPay
   }
   return body as unknown as CreatedPayment;
 }
+
+export interface TrackedOrder {
+  order: {
+    merchant_order_id: string;
+    status: string;
+    payment_status: string;
+    total_amount: number;
+    created_at: string;
+    expires_at: string | null;
+  };
+  items: Array<{ product_name: string; quantity: number; unit_price: number }>;
+}
+
+export async function trackOrder(merchantOrderId: string): Promise<TrackedOrder> {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!baseUrl || !anonKey) throw new Error("Konfigurasi backend belum tersedia.");
+  const response = await fetch(`${baseUrl}/functions/v1/order-tracking`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: anonKey,
+      authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ merchant_order_id: merchantOrderId }),
+  });
+  const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) {
+    const messages: Record<string, string> = {
+      order_not_found: "Nomor pesanan tidak ditemukan.",
+      rate_limit_exceeded: "Terlalu banyak percobaan. Coba lagi beberapa saat.",
+    };
+    throw new Error(messages[String(body.error)] || "Status pesanan belum dapat dimuat.");
+  }
+  return body as unknown as TrackedOrder;
+}

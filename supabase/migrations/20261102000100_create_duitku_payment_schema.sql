@@ -169,7 +169,8 @@ begin
 
     update public.orders
        set payment_status = 'paid',
-           status = case when status = 'pending_payment' then 'confirmed'\n                        when status = 'cancelled' then 'payment_review'\n                        else status end,
+           status = case when status = 'pending_payment' then 'confirmed'
+                        when status = 'cancelled' then 'payment_review'\n                        else status end,
            updated_at = now()
      where id = v_payment.order_id
        and payment_status <> 'paid';

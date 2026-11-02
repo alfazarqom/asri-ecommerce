@@ -134,7 +134,17 @@ export function PaymentPage() {
     <Link className="button button-secondary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link>
   </div>;
 }
-export function PaymentReturnPage() { const [params] = useSearchParams(); const orderId = params.get("merchantOrderId") || params.get("orderId"); return <div className="page-container payment-return"><span className="success-illustration"><ShieldCheck size={32} /></span><PageIntro eyebrow="PAYMENT RETURN" title="Pembayaran sedang diverifikasi" description="Status dari halaman kembali tidak dianggap sebagai bukti pembayaran berhasil. Status final harus dikonfirmasi backend melalui callback Duitku." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><Link className="button button-primary button-full" to="/orders">Lihat pesanan</Link><Link className="text-link center-link" to="/">Kembali ke beranda</Link></div>; }
+export function PaymentReturnPage() {
+  const [params] = useSearchParams();
+  const orderId = params.get("merchantOrderId") || params.get("orderId");
+  return <div className="page-container payment-return">
+    <span className="success-illustration"><ShieldCheck size={32} /></span>
+    <PageIntro eyebrow="PAYMENT RETURN" title="Pembayaran sedang diverifikasi" description="Status dari halaman kembali tidak dianggap sebagai bukti pembayaran berhasil. Status final harus dikonfirmasi backend melalui callback Duitku." />
+    <div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div>
+    <Link className="button button-primary button-full" to={orderId ? `/order-tracking/${encodeURIComponent(orderId)}` : "/orders"}>Lihat status pesanan</Link>
+    <Link className="text-link center-link" to="/">Kembali ke beranda</Link>
+  </div>;
+}
 export function OrderDetailPage() {
   const { orderId = "" } = useParams();
   const [result, setResult] = useState<Awaited<ReturnType<typeof trackOrder>> | null>(null);

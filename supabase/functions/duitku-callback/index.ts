@@ -1,7 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  asRecord,
   constantTimeEqual,
+  duitkuEnvironment,
+  duitkuTransactionStatusEndpoint,
   hmacSha256Hex,
+  isVerifiedTransactionStatus,
   jsonResponse,
   requiredEnv,
   safeText,
@@ -39,6 +43,7 @@ Deno.serve(async (request) => {
 
     const expectedMerchantCode = requiredEnv("DUITKU_MERCHANT_CODE");
     const apiKey = requiredEnv("DUITKU_API_KEY");
+    const environment = duitkuEnvironment();
     if (!constantTimeEqual(merchantCode, expectedMerchantCode)) {
       return new Response("Unauthorized", { status: 401 });
     }
@@ -56,12 +61,12 @@ Deno.serve(async (request) => {
       return new Response("Bad Request", { status: 400 });
     }
 
-    const safePayload = {
+    const safePayload: Record<string, unknown> = {
       merchantCode,
       amount: amountText,
       merchantOrderId,
       reference,
-      resultCode,
+      callbackResultCode: resultCode,
       paymentCode,
       publisherOrderId: safeText(form.get("publisherOrderId"), 100),
       settlementDate: safeText(form.get("settlementDate"), 20),
@@ -69,24 +74,100 @@ Deno.serve(async (request) => {
       transactionState: safeText(form.get("transactionState"), 50),
       transactionStateStatus: safeText(form.get("transactionStateStatus"), 50),
     };
-    const eventKey = await sha256Hex([
-      merchantCode,
-      amountText,
-      merchantOrderId,
-      reference,
-      resultCode,
-      paymentCode ?? "",
-    ].join("|"));
-
-    const creditCardMethods =
-      (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
-        .split(",").map((value) => value.trim()).filter(Boolean);
-
     const supabase = createClient(
       requiredEnv("SUPABASE_URL"),
       requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
+
+    // Avoid repeating the provider inquiry when Duitku retries an already
+    // committed callback. The event key is deterministic for this callback.
+    const { data: existingEvent, error: existingEventError } = await supabase
+      .from("payment_callback_events")
+      .select("id")
+      .eq("merchant_order_id", merchantOrderId)
+      .eq("amount", amount)
+      .eq("processing_status", "processed")
+      .in("result_code", ["00", "02"])
+      .limit(1)
+      .maybeSingle();
+
+    if (existingEventError) {
+      return new Response("Callback Processing Failed", { status: 500 });
+    }
+    if (existingEvent) {
+      return new Response("OK", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    // The POP callback signature covers merchantCode, amount and
+    // merchantOrderId, but not resultCode or reference. Verify the actual
+    // transaction state with Duitku's documented transactionStatus API.
+    const statusSignature = await hmacSha256Hex(
+      apiKey,
+      merchantCode + merchantOrderId,
+    );
+    let statusResponse: Response;
+    try {
+      statusResponse = await fetch(
+        duitkuTransactionStatusEndpoint(environment),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            merchantcode: merchantCode,
+            merchantOrderId,
+            signature: statusSignature,
+          }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+    } catch {
+      return new Response("Transaction Verification Unavailable", {
+        status: 502,
+      });
+    }
+
+    if (!statusResponse.ok) {
+      return new Response("Transaction Verification Failed", {
+        status: 502,
+      });
+    }
+
+    let statusData: Record<string, unknown>;
+    try {
+      statusData = asRecord(await statusResponse.json());
+    } catch {
+      return new Response("Invalid Transaction Verification Response", {
+        status: 502,
+      });
+    }
+
+    if (
+      !isVerifiedTransactionStatus(statusData, {
+        merchantOrderId,
+        reference,
+        amount,
+      })
+    ) {
+      return new Response("Transaction Verification Mismatch", {
+        status: 409,
+      });
+    }
+
+    const verifiedStatusCode = safeText(statusData.statusCode, 10)!;
+    const eventKey = await sha256Hex([
+      merchantCode,
+      amountText,
+      merchantOrderId,
+      verifiedStatusCode,
+    ].join("|"));
+    safePayload.verifiedStatusCode = verifiedStatusCode;
 
     const { data, error } = await supabase.rpc("apply_duitku_callback", {
       p_event_key: eventKey,
@@ -94,9 +175,9 @@ Deno.serve(async (request) => {
       p_amount: amount,
       p_merchant_order_id: merchantOrderId,
       p_reference: reference,
-      p_result_code: resultCode,
+      p_result_code: verifiedStatusCode,
       p_payment_code: paymentCode,
-      p_credit_card_payment_methods: creditCardMethods,
+      p_credit_card_payment_methods: [],
       p_safe_payload: safePayload,
     });
 
@@ -110,8 +191,7 @@ Deno.serve(async (request) => {
       return new Response("Callback Processing Failed", { status: 500 });
     }
 
-    // POP docs describe the callback POST and signature but do not prescribe
-    // a response body; acknowledge only after the database transaction commits.
+    // Acknowledge only after provider verification and the database transaction.
     return new Response("OK", {
       status: 200,
       headers: {

@@ -5,6 +5,7 @@ import {
   duitkuEndpoint,
   duitkuEnvironment,
   hmacSha256Hex,
+  isValidEmail,
   jsonResponse,
   requiredEnv,
   safeText,
@@ -89,10 +90,7 @@ Deno.serve(async (request) => {
     const email = typeof typedOrder.customer_email === "string"
       ? typedOrder.customer_email.trim()
       : "";
-    if (
-      !email || email.length > 255 ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)
-    ) {
+    if (!isValidEmail(email)) {
       return jsonResponse(409, { error: "valid_customer_email_required" });
     }
     if (

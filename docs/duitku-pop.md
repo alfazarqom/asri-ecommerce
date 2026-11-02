@@ -2,14 +2,18 @@
 
 Status: implementation draft in repository; not deployed and not connected to a Supabase project.
 
-Official reference checked: https://docs.duitku.com/pop/id/ (2 November 2026).
+Official references checked: 2 November 2026.
+- POP: https://docs.duitku.com/pop/id/
+- Transaction status verification: https://docs.duitku.com/api/id/
 
 ## Components
 
-- `supabase/functions/_shared/duitku.ts`: HMAC-SHA256, environment selection, and safe response helpers.
+- `supabase/functions/_shared/duitku.ts`: HMAC-SHA256, environment selection, email validation, transaction-status response validation, and safe response helpers.
+- `supabase/functions/_shared/duitku_test.ts`: unit tests for email validation and provider-status matching.
 - `supabase/functions/duitku-create-invoice/index.ts`: server-to-server invoice creation.
-- `supabase/functions/duitku-callback/index.ts`: verified form-urlencoded callback.
-- `supabase/migrations/20261102000100_create_duitku_payment_schema.sql`: order snapshots, payment transactions, callback events, and atomic callback RPC.
+- `supabase/functions/duitku-callback/index.ts`: signed callback receiver and independent transaction-status verification.
+- `supabase/migrations/20261102000100_create_duitku_payment_schema.sql`: order snapshots, payment transactions, callback events, and initial atomic callback RPC.
+- `supabase/migrations/20261102000200_verify_duitku_callback_status.sql`: applies only independently verified transaction status values.
 - `supabase/config.toml`: disables JWT verification for the two endpoints; each endpoint applies its own authentication mechanism.
 
 ## Required environment variables
@@ -30,7 +34,6 @@ Configure these in Supabase Edge Function secrets; never commit their values:
 Optional:
 - `DUITKU_PAYMENT_METHOD`: fixed payment method code, if the merchant intentionally restricts channels.
 - `DUITKU_EXPIRY_PERIOD`: positive integer in minutes; omitted if unset. Confirm the merchant's intended expiry with Duitku before configuring it.
-- `DUITKU_CREDIT_CARD_PAYMENT_METHODS`: comma-separated exact payment method codes configured as credit-card channels; required to classify callback `01` as failed. Leave unset to route `01` to manual review.
 
 ## Database contract
 
@@ -58,7 +61,7 @@ Body:
 
 This endpoint is intentionally server-to-server. Do not call it directly from an untrusted browser because the internal secret must never be exposed to frontend code. A trusted order-creation/backend function should invoke it.
 
-The function reloads the persisted order and item snapshots, verifies the total, and signs the Duitku request using:
+The function reloads the persisted order and item snapshots, verifies the total, validates the customer's email (maximum 255 characters), and signs the POP request using:
 ```text
 stringToSign = merchantCode + timestamp
 signature = HMAC_SHA256(stringToSign, apiKey)
@@ -71,43 +74,57 @@ It uses the documented POP headers:
 
 The invoice response returns only merchant order ID, Duitku reference, payment URL, and local status. A second request returns the existing pending invoice when available; it does not create a second invoice for the same order.
 
-## Callback contract
+## Callback verification contract
 
-Duitku POSTs `application/x-www-form-urlencoded` fields. Required signed fields:
-- `merchantCode`
-- `amount`
-- `merchantOrderId`
-- `signature`
-
-The callback verifies:
+Duitku POP sends `application/x-www-form-urlencoded` callback fields. The callback HMAC is:
 ```text
 stringToSign = merchantCode + amount + merchantOrderId
 signature = HMAC_SHA256(stringToSign, apiKey)
 ```
 
-It then matches merchant order ID, amount, and Duitku `reference` against the persisted pending payment and invokes `apply_duitku_callback`. The database function locks the payment row and processes each callback event key once. `resultCode = 00` is mapped to paid. Based on the merchant clarification, `01` is classified as failed only when the saved invoice payment method matches the configured `DUITKU_CREDIT_CARD_PAYMENT_METHODS` allowlist. Any unexpected `01` on another channel, or any unrecognized non-success code, is placed in `review` for manual reconciliation rather than being assumed failed. Callback `paymentCode` is not treated as the payment-method identifier. A verified success arriving after an order was cancelled changes its order status to `payment_review` so it cannot silently enter fulfillment.
+Important: the documented callback signature does **not** cover `resultCode` or `reference`. A valid callback HMAC alone therefore cannot authenticate those two values. The implementation does not use the callback's unsigned `resultCode` to change payment state.
 
-The POP page specifies the callback POST format and signature but does not clearly prescribe an acknowledgment response body. This implementation returns HTTP 200 `OK` only after the database transaction commits and HTTP 500 for transient processing failures. Confirm retry/acknowledgment expectations with Duitku merchant support before production.
+After validating the callback HMAC, the function calls Duitku's official **Cek Transaksi / transactionStatus** API using:
+- Sandbox: `https://sandbox.duitku.com/webapi/api/merchant/transactionStatus`
+- Production: `https://passport.duitku.com/webapi/api/merchant/transactionStatus`
+- Request signature: `HMAC_SHA256(merchantCode + merchantOrderId, apiKey)`
+- Request fields: merchant code, merchant order ID, and signature.
+
+The provider response must match the callback's merchant order ID, reference, and amount. Only the provider's independently returned `statusCode` is passed to the database RPC:
+- `00`: verified success; payment becomes `paid`.
+- `01`: verified pending; payment remains `pending`.
+- `02`: verified canceled; payment becomes `failed`.
+- Any unrecognized status or any response mismatch is rejected and not acknowledged as processed.
+
+The API documentation's executable PHP/cURL examples send JSON, while its request-type label says `x-www-form-urlencoded`; this discrepancy is retained as an integration caveat and should be confirmed with Duitku before production. The code follows the JSON request examples.
+
+The database RPC locks the matching payment row, checks amount/reference/order binding, and processes verified state transitions idempotently. Terminal verified callbacks are acknowledged without repeating the provider inquiry. Pending callbacks can be checked again when Duitku sends a subsequent callback; this is callback-driven, not scheduled polling. Duitku warns against repeated automatic transaction-status requests because of rate limits.
+
+The POP and API documentation require HTTP 200 for a successfully handled callback and describe up to five callback delivery attempts. This implementation returns HTTP 200 only after verification and the database transaction commit; transient verification or database failures return a non-200 response so the callback is not silently discarded.
 
 ## Important limitations / not yet verified
 
 - No order-creation function exists in this scope. Another trusted backend process must create the order and item snapshots.
 - No frontend caller exists yet. The internal invoice endpoint must be invoked server-to-server.
 - The schema is a new baseline, not reconciled against a live Supabase schema. Review for naming conflicts before applying.
-- No stock decrement/reservation, expiry worker, cancellation, refund execution, reconciliation/inquiry endpoint, rate limiter, or guest order tracking is included.
-- The merchant clarified that current callback outcomes are `00` and `01`, with `01` available only for credit-card transactions; other channels send `00` for successful transactions. This implementation follows that rule and quarantines unexpected codes for review.
-- The documented callback HMAC covers `merchantCode + amount + merchantOrderId`; it does not cover `resultCode` or `reference`. HTTPS is required for callback/return URLs, but this signature limitation should be confirmed with Duitku merchant support before production. The POP page inspected here does not document a status-inquiry endpoint, so independent provider-side reconciliation remains an operational prerequisite for suspicious or disputed callbacks.
+- No stock decrement/reservation, expiry worker, cancellation, refund execution, rate limiter, or guest order tracking is included.
+- The migration has not been executed against production. Functions have not been deployed.
 - Sandbox credentials, merchant configuration, callback delivery, and provider behavior have not been tested.
-- The migration has not been executed. Functions have not been deployed.
+- The transaction-status endpoint's documented request content-type label conflicts with its JSON examples. Confirm the expected content type with Duitku merchant support before production.
+- Duitku warns about transaction-status API rate limits. The implementation avoids scheduled polling and skips provider checks for already-processed terminal callbacks, but actual merchant rate limits have not been tested.
 
 ## Local verification
 
-From a local checkout with Supabase CLI and Deno available:
+From a local checkout with Supabase CLI and Deno v2 available:
 ```sh
-supabase db lint --local
 deno check supabase/functions/_shared/duitku.ts
 deno check supabase/functions/duitku-create-invoice/index.ts
 deno check supabase/functions/duitku-callback/index.ts
+deno test supabase/functions/
+deno lint supabase/functions/
+deno fmt --check supabase/functions/
+supabase db reset --local
+supabase db lint --local
 ```
 
-These commands are guidance only; no runtime or database test is claimed by this commit.
+These commands are executed by repository CI where configured. No production migration, deployment, or live payment test is authorized or claimed by this change.

@@ -40,7 +40,13 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/requirement-v1.sql
 
       - name: Lint local database schema
-        run: supabase db lint --local
+        run: |
+          set -o pipefail
+          supabase db lint --local 2>&1 | tee /tmp/supabase-db-lint.log
+          if grep -q '"level": "error"' /tmp/supabase-db-lint.log; then
+            echo "::error::Supabase schema lint reported SQL errors."
+            exit 1
+          fi
 
       - name: Stop local Supabase stack
         if: always()

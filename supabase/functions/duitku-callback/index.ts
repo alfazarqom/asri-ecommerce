@@ -74,15 +74,6 @@ Deno.serve(async (request) => {
       transactionState: safeText(form.get("transactionState"), 50),
       transactionStateStatus: safeText(form.get("transactionStateStatus"), 50),
     };
-    const eventKey = await sha256Hex([
-      merchantCode,
-      amountText,
-      merchantOrderId,
-      reference,
-      resultCode,
-      paymentCode ?? "",
-    ].join("|"));
-
     const supabase = createClient(
       requiredEnv("SUPABASE_URL"),
       requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
@@ -94,7 +85,11 @@ Deno.serve(async (request) => {
     const { data: existingEvent, error: existingEventError } = await supabase
       .from("payment_callback_events")
       .select("id")
-      .eq("event_key", eventKey)
+      .eq("merchant_order_id", merchantOrderId)
+      .eq("amount", amount)
+      .eq("processing_status", "processed")
+      .in("result_code", ["00", "02"])
+      .limit(1)
       .maybeSingle();
 
     if (existingEventError) {
@@ -166,6 +161,12 @@ Deno.serve(async (request) => {
     }
 
     const verifiedStatusCode = safeText(statusData.statusCode, 10)!;
+    const eventKey = await sha256Hex([
+      merchantCode,
+      amountText,
+      merchantOrderId,
+      verifiedStatusCode,
+    ].join("|"));
     const creditCardMethods =
       (Deno.env.get("DUITKU_CREDIT_CARD_PAYMENT_METHODS") ?? "")
         .split(",").map((value) => value.trim()).filter(Boolean);

@@ -1,6 +1,6 @@
 {
   "name": "ASRI Collection Design System",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Modern, minimal, premium ecommerce storefront design system",
   "framework": {
     "library": "React",
@@ -72,6 +72,30 @@
       "warning": "#F59E0B",
       "error": "#EF4444",
       "info": "#3B82F6"
+    },
+    "semantic": {
+      "overlay": "rgba(23,26,33,0.56)",
+      "skeleton": {
+        "base": "#E5E7EB",
+        "highlight": "#F8FAFC"
+      },
+      "link": "#16803D",
+      "selected": {
+        "background": "#DCFCE7",
+        "border": "#16803D",
+        "foreground": "#115C2E"
+      },
+      "disabled": {
+        "background": "#F1F5F9",
+        "foreground": "#94A3B8",
+        "border": "#E5E7EB"
+      },
+      "focus": "#16803D",
+      "stock": {
+        "available": "#16A34A",
+        "low": "#F59E0B",
+        "out": "#64748B"
+      }
     }
   },
   "typography": {
@@ -125,6 +149,33 @@
         "lineHeight": "16px",
         "fontWeight": 400
       }
+    },
+    "letterSpacing": {
+      "tight": "-0.02em",
+      "normal": "0",
+      "wide": "0.02em"
+    },
+    "responsive": {
+      "display": {
+        "mobile": "24px",
+        "tablet": "28px",
+        "desktop": "30px"
+      },
+      "h1": {
+        "mobile": "22px",
+        "tablet": "24px",
+        "desktop": "24px"
+      },
+      "body": {
+        "mobile": "14px",
+        "tablet": "14px",
+        "desktop": "14px"
+      }
+    },
+    "textBehavior": {
+      "truncation": "Use line-clamp only where content preview is intended; preserve full accessible name",
+      "multiline": "Allow wrapping for body text and form feedback",
+      "fontLoading": "Use configured fallback stack while Inter loads"
     }
   },
   "spacing": {
@@ -194,8 +245,8 @@
       "flexShrink": "0"
     },
     "bottomNavigation": {
-      "flexShrink": "0",
-      "position": "static"
+      "safeAreaBottom": "env(safe-area-inset-bottom, 0px)",
+      "boxSizing": "border-box"
     },
     "standaloneShell": {
       "display": "flex",
@@ -210,7 +261,8 @@
       "bodyScroll": false,
       "avoidNestedScrollContainers": true,
       "percentageHeightRequiresDefinedParentHeight": true,
-      "viewportUnitsAllowedForShellHeight": false
+      "viewportUnitsAllowedForShellHeight": false,
+      "standalonePrimaryScrollContainer": "standaloneContent"
     },
     "container": {
       "width": "100%",
@@ -280,6 +332,39 @@
       "position": "static",
       "flexShrink": "0",
       "width": "100%"
+    },
+    "headerResponsive": {
+      "mobile": {
+        "height": "56px",
+        "search": "icon-button"
+      },
+      "tablet": {
+        "height": "60px",
+        "search": "compact"
+      },
+      "desktop": {
+        "height": "64px",
+        "search": "expanded"
+      }
+    },
+    "footer": {
+      "width": "100%",
+      "flexShrink": "0"
+    },
+    "bottomDrawer": {
+      "maxHeight": "min(85dvh, 720px)",
+      "overflowY": "auto",
+      "overscrollBehaviorY": "contain"
+    },
+    "modal": {
+      "maxHeight": "min(90dvh, 800px)",
+      "overflowY": "auto",
+      "overscrollBehaviorY": "contain"
+    },
+    "longContent": {
+      "allowContentGrowth": true,
+      "scrollContainer": "content",
+      "avoidFixedHeightOnTextContent": true
     }
   },
   "radius": {
@@ -385,7 +470,8 @@
     },
     "toast": {
       "position": "top",
-      "duration": "200ms"
+      "animationDuration": "200ms",
+      "displayDuration": "3000ms"
     },
     "bottomActionBar": {
       "background": "colors.surface.DEFAULT",
@@ -397,6 +483,130 @@
         "primaryAction": true,
         "secondaryAction": true,
         "minimumTouchTarget": "44px"
+      }
+    },
+    "navigation": {
+      "header": {
+        "uses": [
+          "AppLogo",
+          "SearchButton",
+          "CartButton",
+          "ProfileButton"
+        ]
+      },
+      "bottomNavigation": {
+        "activeStateRequired": true,
+        "accessibleLabelRequired": true
+      },
+      "breadcrumb": {
+        "showOn": "hierarchical standalone pages",
+        "wrapOnNarrowScreens": true
+      }
+    },
+    "product": {
+      "productCard": {
+        "reuse": "components.productCard",
+        "states": [
+          "default",
+          "hover",
+          "selected",
+          "unavailable"
+        ],
+        "stockIndicator": true
+      },
+      "productGallery": {
+        "reuse": "components.productGallery",
+        "imageViewer": "Overlays.ImageViewer"
+      },
+      "stockIndicator": {
+        "source": "product availability and stock data",
+        "states": [
+          "available",
+          "low",
+          "out"
+        ],
+        "availabilityAndQuantityAreDistinct": true
+      }
+    },
+    "discovery": {
+      "searchBar": {
+        "reuse": "components.searchBar",
+        "clearAction": true,
+        "accessibleLabelRequired": true
+      },
+      "filterPanel": {
+        "presentation": [
+          "inline",
+          "Overlays.BottomDrawer"
+        ]
+      },
+      "sortSelector": {
+        "presentation": [
+          "select",
+          "Overlays.BottomDrawer"
+        ]
+      }
+    },
+    "cart": {
+      "cartItem": {
+        "reuse": "components.cartItem"
+      },
+      "cartSummary": {
+        "showSubtotal": true,
+        "showAdditionalChargesWhenApplicable": true
+      },
+      "quantitySelector": {
+        "reuse": "components.quantitySelector",
+        "minimumTouchTarget": "44px"
+      }
+    },
+    "checkout": {
+      "addressCard": {
+        "selectedStateRequired": true
+      },
+      "shippingOption": {
+        "selectedStateRequired": true,
+        "showPrice": true
+      },
+      "paymentMethod": {
+        "selectedStateRequired": true,
+        "showAvailability": true
+      }
+    },
+    "order": {
+      "orderStatus": {
+        "colorIsNotSoleIndicator": true
+      },
+      "orderTimeline": {
+        "semanticOrderedList": true
+      },
+      "trackingInfo": {
+        "labelValuePairs": true
+      }
+    },
+    "feedback": {
+      "confirmationDialog": {
+        "component": "Overlays.ConfirmationDialog",
+        "requiresClearPrimaryAndCancelActions": true
+      },
+      "successState": {
+        "iconAndTextRequired": true
+      },
+      "errorState": {
+        "messageRequired": true,
+        "recoveryActionWhenAvailable": true
+      }
+    },
+    "content": {
+      "sectionHeader": {
+        "titleRequired": true,
+        "optionalAction": true
+      },
+      "divider": {
+        "color": "colors.border.DEFAULT"
+      },
+      "pagination": {
+        "keyboardAccessible": true
       }
     }
   },
@@ -424,13 +634,38 @@
       "default",
       "hover",
       "active",
+      "pressed",
       "focus",
+      "selected",
       "disabled",
       "loading",
+      "processing",
+      "expanded",
+      "collapsed",
       "error",
       "empty",
-      "success"
-    ]
+      "success",
+      "unavailable"
+    ],
+    "behavior": {
+      "loading": {
+        "preventDuplicateSubmission": true,
+        "showDummyProducts": false
+      },
+      "processing": {
+        "mustNotImplyPaymentCompleted": true
+      },
+      "unavailable": {
+        "distinctFromDisabled": true,
+        "explainReasonWhenUseful": true
+      },
+      "stock": {
+        "availabilityAndQuantityAreSeparate": true
+      },
+      "errors": {
+        "provideRecoveryActionWhenPossible": true
+      }
+    }
   },
   "loading": {
     "strategy": "skeleton",
@@ -450,7 +685,26 @@
     "validationMessagesMustBeProgrammaticallyAssociated": true,
     "textContrastMinimum": "4.5:1",
     "largeTextContrastMinimum": "3:1",
-    "nonTextContrastMinimum": "3:1"
+    "nonTextContrastMinimum": "3:1",
+    "modal": {
+      "trapFocus": true,
+      "restoreFocusOnClose": true,
+      "closeOnEscape": true,
+      "announceDialogNameAndDescription": true
+    },
+    "overlays": {
+      "drawerKeyboardNavigation": true,
+      "focusManagement": true,
+      "preventBackgroundInteractionWhileModalOpen": true
+    },
+    "announcements": {
+      "dynamicStatus": "Use polite live announcements for non-urgent updates",
+      "urgentError": "Use assertive announcement only for urgent blocking errors"
+    },
+    "iconButtons": {
+      "requireAccessibleName": true
+    },
+    "focusVisible": true
   },
   "icons": {
     "library": "lucide-react",
@@ -480,17 +734,43 @@
       "success": "colors.status.success",
       "warning": "colors.status.warning",
       "error": "colors.status.error",
-      "info": "colors.status.info"
+      "info": "colors.status.info",
+      "overlay": "colors.semantic.overlay",
+      "link": "colors.semantic.link",
+      "selected": "colors.semantic.selected.background",
+      "disabled": "colors.semantic.disabled.background",
+      "stockAvailable": "colors.semantic.stock.available",
+      "stockLow": "colors.semantic.stock.low",
+      "stockOut": "colors.semantic.stock.out"
     },
     "spacingSource": "spacing.scale",
     "radiusSource": "radius",
-    "shadowSource": "shadows"
+    "shadowSource": "shadows",
+    "typographySource": "typography",
+    "semanticColorSource": "colors.semantic"
   },
   "safeArea": {
     "enabled": true,
     "bottomActionBar": {
       "paddingBottom": "env(safe-area-inset-bottom, 0px)",
       "boxSizing": "border-box"
+    },
+    "bottomNavigation": {
+      "paddingBottom": "env(safe-area-inset-bottom, 0px)",
+      "boxSizing": "border-box"
+    }
+  },
+  "feedback": {
+    "toast": {
+      "animationDuration": "200ms",
+      "displayDuration": "3000ms",
+      "position": "top",
+      "dismissible": true,
+      "pauseOnHover": true
+    },
+    "transitions": {
+      "duration": "200ms",
+      "easing": "ease-in-out"
     }
   }
 }

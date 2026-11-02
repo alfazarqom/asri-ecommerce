@@ -163,7 +163,7 @@ There is no automated Duitku refund API call in this implementation. A late paym
 2. Perform the refund through the merchant's approved Duitku process/dashboard.
 3. Only after the provider refund is confirmed, call the service-role-only `resolve_asri_reconciliation_case(case_id, 'refunded')` RPC to mark the payment and order refunded and close the case.
 
-The RPC is not exposed to anon/authenticated clients. A `'resolved'` resolution closes a case without claiming a provider refund occurred. Do not mark a case refunded before the external refund is actually complete.
+The RPC is not exposed to anon/authenticated clients. A `'resolved'` resolution closes a case without claiming a provider refund occurred. The service-role-only `cancel_asri_unpaid_order(merchant_order_id)` RPC supports admin cancellation of an unpaid order and restores stock once; it refuses paid/terminal orders and opens a review case if stock cannot be restored. Do not mark a case refunded before the external refund is actually complete.
 
 ## Verification
 

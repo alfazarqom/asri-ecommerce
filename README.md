@@ -30,7 +30,7 @@ VITE_PRODUCTS_FUNCTION=get-asri-products
 Only public browser-safe values may use the `VITE_` prefix. Never put Supabase service-role credentials, Duitku API keys, or internal invoice secrets in frontend environment variables.
 
 ## Catalog integration
-The storefront reads the public `get-asri-products` Supabase Edge Function. The current function returns a JSON array of full `asri_products` rows. The frontend normalizes common product field names for display while retaining the original row in memory. Confirm the actual database columns and image URL fields before production use.
+The storefront reads the public `get-asri-products` Supabase Edge Function. The current function returns a JSON array of full `asri_products` rows. The frontend maps the current schema fields (`title`, `price`, `sale_price`, `image_link`, `additional_image_link`, `product_type`, `availability`, and `inventory`) and retains the original row in memory.
 
 ## Implemented customer pages
 - App shell: Home, Product listing, Search, Wishlist, Orders, Profile

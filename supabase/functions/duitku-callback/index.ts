@@ -87,6 +87,7 @@ Deno.serve(async (request) => {
       .select("id")
       .eq("merchant_order_id", merchantOrderId)
       .eq("amount", amount)
+      .eq("provider_reference", reference)
       .eq("processing_status", "processed")
       .in("result_code", ["00", "02"])
       .limit(1)

@@ -59,17 +59,17 @@ Deno.serve(async (request) => {
     });
 
     const { data, error } = await supabase
-      .from("asri_products")
+      .from("products")
       .select("*")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error("Could not read asri_products:", error.message);
+      console.error("Could not read products:", error.message);
       return jsonResponse(500, { error: "products_fetch_failed" });
     }
 
-    // The successful response is a JSON array of complete asri_products rows.
+    // The successful response is a JSON array of complete products rows.
     return jsonResponse(200, data ?? [], {
       "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
     });

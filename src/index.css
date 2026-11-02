@@ -308,3 +308,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.standalone-bottom-action { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 10px 16px calc(10px + var(--safe-bottom)); background: #fff; border-top: 1px solid var(--line); }
+.bottom-action-price { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bottom-action-price small { color: var(--muted); font-size: 9px; }
+.bottom-action-price strong { font-size: 13px; }
+.standalone-bottom-action .button { min-width: 132px; }
+.bottom-cart-button { border: 1px solid var(--line); }
+.detail-actions { display: none; }
+@media (min-width: 640px) {
+  .standalone-bottom-action { padding-left: 24px; padding-right: 24px; }
+}
+@media (min-width: 1024px) {
+  .standalone-bottom-action { padding-left: max(32px, calc((100% - 1216px) / 2)); padding-right: max(32px, calc((100% - 1216px) / 2)); }
+}

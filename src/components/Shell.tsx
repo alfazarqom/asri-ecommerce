@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Heart, Home, Menu, Package, Search, ShoppingBag, UserRound, X } from "lucide-react";
+import { ArrowLeft, Heart, Home, Menu, Package, Search, ShoppingBag, UserRound, X } from "lucide-react";
 import { useStore } from "../store/useStore";
 
 const navItems = [
@@ -45,7 +45,7 @@ export function StandaloneLayout() {
   const location = useLocation();
   const title = location.pathname.startsWith("/cart") ? "Keranjang" : location.pathname.startsWith("/checkout") ? "Checkout" : location.pathname.startsWith("/payment") ? "Pembayaran" : "ASRI Collection";
   return <div className="standalone-shell">
-    <header className="standalone-header"><button className="icon-button" onClick={() => navigate(-1)} aria-label="Kembali"><X size={20} /></button><strong>{title}</strong><Link to="/" className="standalone-brand">ASRI</Link></header>
+    <header className="standalone-header"><button className="icon-button" onClick={() => navigate(-1)} aria-label="Kembali"><ArrowLeft size={20} /></button><strong>{title}</strong><Link to="/" className="standalone-brand">ASRI</Link></header>
     <main className="standalone-content"><Outlet /></main>
   </div>;
 }

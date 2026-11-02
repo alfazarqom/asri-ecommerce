@@ -290,13 +290,15 @@ Deno.serve(async (request) => {
       : "https://app-prod.duitku.com";
     let paymentUrlIsValid = false;
     try {
-      paymentUrlIsValid = new URL(paymentUrl ?? "").origin === expectedPaymentOrigin;
+      paymentUrlIsValid =
+        new URL(paymentUrl ?? "").origin === expectedPaymentOrigin;
     } catch {
       paymentUrlIsValid = false;
     }
 
     if (
-      !providerResponse.ok || statusCode !== "00" || !reference || !paymentUrl ||
+      !providerResponse.ok || statusCode !== "00" || !reference ||
+      !paymentUrl ||
       !paymentUrlIsValid
     ) {
       await supabase.from("payment_transactions").update({

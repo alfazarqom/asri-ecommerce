@@ -38,6 +38,8 @@ export async function createOrder(customer: CreateOrderInput, cart: CartLine[], 
     const messages: Record<string, string> = {
       product_or_stock_unavailable: "Ada produk yang sudah tidak tersedia atau stoknya berubah. Periksa kembali keranjang.",
       invalid_order_input: "Periksa kembali informasi pelanggan dan alamat pengiriman.",
+      rate_limit_exceeded: "Terlalu banyak percobaan checkout. Coba lagi beberapa saat.",
+      order_service_unavailable: "Layanan pesanan sedang tidak tersedia. Coba lagi nanti.",
     };
     throw new Error(messages[String(body.error)] || "Pesanan belum dapat dibuat. Silakan coba lagi.");
   }
@@ -71,6 +73,7 @@ export async function createPayment(merchantOrderId: string): Promise<CreatedPay
       order_not_payable: "Pesanan tidak lagi dapat dibayar.",
       order_expired: "Batas waktu pembayaran pesanan telah berakhir.",
       invoice_creation_already_started: "Invoice sedang diproses. Coba muat ulang beberapa saat lagi.",
+      rate_limit_exceeded: "Terlalu banyak percobaan pembayaran. Coba lagi beberapa saat.",
     };
     throw new Error(messages[String(body.error)] || "Invoice pembayaran belum dapat dibuat.");
   }

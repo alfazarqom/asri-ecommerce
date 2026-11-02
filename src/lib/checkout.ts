@@ -23,7 +23,7 @@ export async function createOrder(customer: CreateOrderInput, cart: CartLine[], 
   if (!baseUrl) throw new Error("Konfigurasi backend belum tersedia.");
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (anonKey) headers.apikey = anonKey;
+  if (anonKey) { headers.apikey = anonKey; headers.authorization = `Bearer ${anonKey}`; }
   const response = await fetch(`${baseUrl}/functions/v1/create-order`, {
     method: "POST",
     headers,

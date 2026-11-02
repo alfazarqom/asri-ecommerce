@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, ChevronRight, CircleHelp, MapPin, Minus, Package, Plus, ShieldCheck, ShoppingBag, Truck, Wallet } from "lucide-react";
 import { useStore } from "../store/useStore";
@@ -54,7 +54,7 @@ export function CheckoutPage() {
 
   if (!cart.length) return <div className="page-container"><EmptyState title="Keranjang kosong" description="Tambahkan produk sebelum checkout." action="Lihat produk" /></div>;
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);

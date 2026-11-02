@@ -1,4 +1,5 @@
 import type { Product } from "../types";
+import { supabaseAnonKey, supabaseUrl } from "./supabase";
 
 const first = (row: Record<string, unknown>, keys: string[]) => {
   for (const key of keys) {
@@ -57,12 +58,9 @@ export function normalizeProduct(input: unknown): Product {
 }
 
 export async function fetchProducts(signal?: AbortSignal): Promise<Product[]> {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const baseUrl = supabaseUrl.replace(/\/$/, "");
   const functionName = import.meta.env.VITE_PRODUCTS_FUNCTION || "get-asri-products";
-  if (!baseUrl) throw new Error("Konfigurasi katalog belum tersedia. Tambahkan VITE_SUPABASE_URL pada environment.");
-  const headers: Record<string, string> = {};
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (anonKey) headers.apikey = anonKey;
+  const headers: Record<string, string> = { apikey: supabaseAnonKey };
   const response = await fetch(`${baseUrl}/functions/v1/${functionName}?limit=1000&offset=0`, { headers, signal });
   if (!response.ok) throw new Error(response.status === 404 ? "Endpoint katalog tidak ditemukan." : "Katalog belum dapat dimuat. Coba lagi beberapa saat.");
   const body: unknown = await response.json();

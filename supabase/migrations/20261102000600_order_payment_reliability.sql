@@ -714,3 +714,129 @@ revoke all on function public.resolve_asri_reconciliation_case(uuid, text)
   from public, anon, authenticated;
 grant execute on function public.resolve_asri_reconciliation_case(uuid, text)
   to service_role;
+
+-- Admin cancellation is available only to a trusted server using service_role.
+-- It restores stock atomically and refuses paid/terminal orders.
+create or replace function public.cancel_asri_unpaid_order(
+  p_merchant_order_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_order public.orders%rowtype;
+  v_item record;
+  v_inventory integer;
+  v_restore_ok boolean := true;
+begin
+  if p_merchant_order_id is null or length(trim(p_merchant_order_id)) < 8 then
+    raise exception 'Invalid merchant order ID' using errcode = '22023';
+  end if;
+
+  select * into v_order
+    from public.orders
+   where merchant_order_id = p_merchant_order_id
+   for update;
+  if not found then
+    raise exception 'Order not found' using errcode = 'P0002';
+  end if;
+
+  if v_order.status <> 'pending_payment'
+     or v_order.payment_status not in ('pending', 'failed')
+     or v_order.stock_released_at is not null
+     or exists (
+       select 1
+         from public.payment_transactions
+        where order_id = v_order.id
+          and status in ('paid', 'refunded')
+     ) then
+    raise exception 'Order is not eligible for unpaid cancellation'
+      using errcode = '55000';
+  end if;
+
+  for v_item in
+    select product_id_text, sum(quantity)::integer as quantity
+      from public.order_items
+     where order_id = v_order.id
+       and product_id_text is not null
+     group by product_id_text
+     order by product_id_text
+  loop
+    select inventory into v_inventory
+      from public.products
+     where id = v_item.product_id_text
+     for update;
+    if not found then
+      v_restore_ok := false;
+      exit;
+    end if;
+  end loop;
+
+  if not v_restore_ok then
+    update public.orders
+       set status = 'payment_review',
+           payment_status = 'review',
+           updated_at = now()
+     where id = v_order.id;
+
+    insert into public.payment_reconciliation_cases (
+      order_id, merchant_order_id, case_type, details
+    ) values (
+      v_order.id,
+      v_order.merchant_order_id,
+      'stock_restore_failed',
+      jsonb_build_object('reason', 'product_missing_during_admin_cancel')
+    )
+    on conflict (order_id, case_type, status) do nothing;
+
+    return jsonb_build_object(
+      'ok', false,
+      'requires_review', true,
+      'merchant_order_id', v_order.merchant_order_id
+    );
+  end if;
+
+  for v_item in
+    select product_id_text, sum(quantity)::integer as quantity
+      from public.order_items
+     where order_id = v_order.id
+       and product_id_text is not null
+     group by product_id_text
+     order by product_id_text
+  loop
+    update public.products
+       set inventory = inventory + v_item.quantity,
+           updated_at = now()
+     where id = v_item.product_id_text
+       and inventory is not null;
+  end loop;
+
+  update public.orders
+     set status = 'cancelled',
+         payment_status = 'expired',
+         stock_released_at = now(),
+         updated_at = now()
+   where id = v_order.id
+     and stock_released_at is null;
+
+  update public.payment_transactions
+     set status = 'expired',
+         provider_result_code = coalesce(provider_result_code, 'CANCELLED'),
+         updated_at = now()
+   where order_id = v_order.id
+     and status in ('creating', 'pending', 'failed');
+
+  return jsonb_build_object(
+    'ok', true,
+    'requires_review', false,
+    'merchant_order_id', v_order.merchant_order_id
+  );
+end;
+$$;
+
+revoke all on function public.cancel_asri_unpaid_order(text)
+  from public, anon, authenticated;
+grant execute on function public.cancel_asri_unpaid_order(text)
+  to service_role;

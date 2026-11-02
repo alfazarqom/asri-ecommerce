@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { sha256Hex } from "../_shared/duitku.ts";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -45,6 +46,27 @@ Deno.serve(async (request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const clientIp = request.headers.get("cf-connecting-ip")?.trim() ||
+      (forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(-1) : "");
+    if (!clientIp) {
+      return jsonResponse(400, { error: "client_ip_unavailable" });
+    }
+    const { data: rateAllowed, error: rateError } = await supabase.rpc(
+      "consume_asri_rate_limit",
+      {
+        p_key_hash: await sha256Hex("create-payment|" + clientIp),
+        p_max_requests: 5,
+        p_window_seconds: 60,
+      },
+    );
+    if (rateError) {
+      return jsonResponse(503, { error: "rate_limit_unavailable" });
+    }
+    if (rateAllowed !== true) {
+      return jsonResponse(429, { error: "rate_limit_exceeded" });
+    }
+
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("merchant_order_id, status, payment_status, expires_at")

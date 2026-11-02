@@ -78,7 +78,7 @@ Deno.serve(async (request) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("merchant_order_id, status, payment_status, total_amount, created_at, expires_at")
+      .select("id, merchant_order_id, status, payment_status, total_amount, created_at, expires_at")
       .eq("merchant_order_id", merchantOrderId)
       .maybeSingle();
 
@@ -92,13 +92,7 @@ Deno.serve(async (request) => {
     const { data: items, error: itemsError } = await supabase
       .from("order_items")
       .select("product_name, quantity, unit_price")
-      .eq("order_id", (
-        await supabase
-          .from("orders")
-          .select("id")
-          .eq("merchant_order_id", merchantOrderId)
-          .single()
-      ).data?.id ?? "");
+      .eq("order_id", order.id);
 
     if (itemsError) {
       return jsonResponse(500, { error: "tracking_items_lookup_failed" });

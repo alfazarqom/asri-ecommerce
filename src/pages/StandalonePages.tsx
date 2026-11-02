@@ -76,7 +76,44 @@ export function CheckoutPage() {
 }
 export function AddressPage() { return <div className="page-container"><PageIntro title="Alamat pengiriman" description="Kelola alamat untuk pesananmu." /><EmptyState title="Belum ada alamat tersimpan" description="Alamat dapat diisi saat checkout tamu." action="Kembali ke checkout" to="/checkout" icon="package" /></div>; }
 export function ShippingPage() { return <div className="page-container"><PageIntro title="Pengiriman" description="Pilihan pengiriman pesanan." /><div className="integration-notice"><Truck size={20} /><p>Ongkos kirim tetap Rp52.000 untuk seluruh Indonesia.</p></div><Link className="button button-primary" to="/checkout">Kembali ke checkout</Link></div>; }
-export function PaymentPage() { const [params] = useSearchParams(); const orderId = params.get("orderId") || ""; return <div className="page-container"><PageIntro title="Pembayaran" description="Pesanan sudah dibuat. Invoice Duitku akan tersedia setelah proses integrasi pembayaran backend selesai." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><div className="payment-method-card"><span className="payment-icon"><Wallet /></span><div><strong>Duitku POP</strong><p>Invoice belum dibuat oleh tahap ini.</p></div><span className="status-pill pending">Menunggu</span></div><Link className="button button-secondary" to="/orders">Lacak pesanan</Link></div>; }
+export function PaymentPage() {
+  const [params] = useSearchParams();
+  const orderId = params.get("orderId") || "";
+  const [paymentUrl, setPaymentUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    if (!orderId) {
+      setError("Nomor pesanan tidak ditemukan.");
+      setLoading(false);
+      return;
+    }
+    createPayment(orderId)
+      .then((payment) => {
+        if (active) setPaymentUrl(payment.payment_url);
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Invoice belum dapat dibuat.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [orderId]);
+  return <div className="page-container">
+    <PageIntro title="Pembayaran" description="Invoice dibuat melalui server Asri dan Duitku. Status pembayaran final tetap menunggu callback resmi." />
+    <div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div>
+    <div className="payment-method-card">
+      <span className="payment-icon"><Wallet /></span>
+      <div><strong>Duitku POP</strong><p>{loading ? "Menyiapkan invoice…" : paymentUrl ? "Invoice siap. Lanjutkan pembayaran di halaman Duitku." : "Invoice belum tersedia."}</p></div>
+      <span className="status-pill pending">Menunggu</span>
+    </div>
+    {error ? <div className="integration-notice" role="alert"><CircleHelp size={18} /><p>{error}</p></div> : null}
+    {paymentUrl ? <a className="button button-primary button-full" href={paymentUrl} target="_blank" rel="noopener noreferrer">Lanjutkan ke Duitku <ArrowRight size={16} /></a> : null}
+    <Link className="button button-secondary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link>
+  </div>;
+}
 export function PaymentReturnPage() { const [params] = useSearchParams(); const orderId = params.get("merchantOrderId") || params.get("orderId"); return <div className="page-container payment-return"><span className="success-illustration"><ShieldCheck size={32} /></span><PageIntro eyebrow="PAYMENT RETURN" title="Pembayaran sedang diverifikasi" description="Status dari halaman kembali tidak dianggap sebagai bukti pembayaran berhasil. Status final harus dikonfirmasi backend melalui callback Duitku." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><Link className="button button-primary button-full" to="/orders">Lihat pesanan</Link><Link className="text-link center-link" to="/">Kembali ke beranda</Link></div>; }
 export function OrderDetailPage() { const { orderId = "" } = useParams(); return <div className="page-container"><PageIntro title="Detail pesanan" description="Ringkasan informasi pesanan." /><div className="integration-notice"><Package size={20} /><p>Data detail pesanan belum dapat dimuat karena endpoint order dan tracking belum tersedia.</p></div><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId}</strong></div><Link className="button button-primary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link></div>; }
 export function OrderTrackingPage() { const { orderId = "" } = useParams(); const [value,setValue] = useState(orderId); return <div className="page-container"><PageIntro eyebrow="ORDER STATUS" title="Lacak pesanan" description="Pantau perjalanan pesanan ASRI kamu." /><form className="order-lookup-card" onSubmit={e=>{e.preventDefault(); window.history.replaceState({}, "", `/order-tracking/${encodeURIComponent(value)}`); useStore.getState().notify("Nomor pesanan disiapkan. Status belum dapat dimuat tanpa API tracking.","info");}}><label htmlFor="tracking-id">Nomor pesanan</label><input id="tracking-id" required value={value} onChange={e=>setValue(e.target.value)} placeholder="Masukkan nomor pesanan" /><button className="button button-primary button-full" type="submit">Periksa status <ArrowRight size={16} /></button></form><div className="integration-notice"><Package size={20} /><p>Layanan tracking tamu belum tersedia. Status pesanan tidak akan ditebak atau dibuat secara lokal.</p></div></div>; }

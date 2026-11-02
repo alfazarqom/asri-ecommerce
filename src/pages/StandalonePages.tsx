@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, ChevronRight, CircleHelp, MapPin, Minus, Package, Plus, ShieldCheck, ShoppingBag, Truck, Wallet } from "lucide-react";
 import { useStore } from "../store/useStore";
@@ -6,7 +6,7 @@ import { formatRupiah } from "../lib/format";
 import { ProductCard } from "../components/ProductCard";
 import { EmptyState } from "../components/States";
 import { Modal } from "../components/Overlays";
-import { createOrder } from "../lib/checkout";
+import { createOrder, createPayment, trackOrder } from "../lib/checkout";
 
 function PageIntro({ eyebrow, title, description }: { eyebrow?: string; title: string; description?: string }) {
   return <div className="standalone-intro">{eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}<h1>{title}</h1>{description ? <p>{description}</p> : null}</div>;
@@ -115,5 +115,73 @@ export function PaymentPage() {
   </div>;
 }
 export function PaymentReturnPage() { const [params] = useSearchParams(); const orderId = params.get("merchantOrderId") || params.get("orderId"); return <div className="page-container payment-return"><span className="success-illustration"><ShieldCheck size={32} /></span><PageIntro eyebrow="PAYMENT RETURN" title="Pembayaran sedang diverifikasi" description="Status dari halaman kembali tidak dianggap sebagai bukti pembayaran berhasil. Status final harus dikonfirmasi backend melalui callback Duitku." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><Link className="button button-primary button-full" to="/orders">Lihat pesanan</Link><Link className="text-link center-link" to="/">Kembali ke beranda</Link></div>; }
-export function OrderDetailPage() { const { orderId = "" } = useParams(); return <div className="page-container"><PageIntro title="Detail pesanan" description="Ringkasan informasi pesanan." /><div className="integration-notice"><Package size={20} /><p>Data detail pesanan belum dapat dimuat karena endpoint order dan tracking belum tersedia.</p></div><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId}</strong></div><Link className="button button-primary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link></div>; }
-export function OrderTrackingPage() { const { orderId = "" } = useParams(); const [value,setValue] = useState(orderId); return <div className="page-container"><PageIntro eyebrow="ORDER STATUS" title="Lacak pesanan" description="Pantau perjalanan pesanan ASRI kamu." /><form className="order-lookup-card" onSubmit={e=>{e.preventDefault(); window.history.replaceState({}, "", `/order-tracking/${encodeURIComponent(value)}`); useStore.getState().notify("Nomor pesanan disiapkan. Status belum dapat dimuat tanpa API tracking.","info");}}><label htmlFor="tracking-id">Nomor pesanan</label><input id="tracking-id" required value={value} onChange={e=>setValue(e.target.value)} placeholder="Masukkan nomor pesanan" /><button className="button button-primary button-full" type="submit">Periksa status <ArrowRight size={16} /></button></form><div className="integration-notice"><Package size={20} /><p>Layanan tracking tamu belum tersedia. Status pesanan tidak akan ditebak atau dibuat secara lokal.</p></div></div>; }
+export function OrderDetailPage() {
+  const { orderId = "" } = useParams();
+  const [result, setResult] = useState<Awaited<ReturnType<typeof trackOrder>> | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    if (!orderId) return;
+    trackOrder(orderId)
+      .then((data) => { if (active) setResult(data); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Detail pesanan belum tersedia."); });
+    return () => { active = false; };
+  }, [orderId]);
+  return <div className="page-container">
+    <PageIntro title="Detail pesanan" description="Ringkasan status pesanan dari server Asri." />
+    <div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId}</strong></div>
+    {error ? <div className="integration-notice" role="alert"><Package size={20} /><p>{error}</p></div> : null}
+    {result ? <div className="order-lookup-card">
+      <p>Status pesanan: <strong>{result.order.status}</strong></p>
+      <p>Status pembayaran: <strong>{result.order.payment_status}</strong></p>
+      <p>Total: <strong>{formatRupiah(result.order.total_amount)}</strong></p>
+      <h2>Item pesanan</h2>
+      {result.items.map((item, index) => <div className="checkout-total" key={`${item.product_name}-${index}`}><span>{item.product_name} × {item.quantity}</span><strong>{formatRupiah(item.unit_price * item.quantity)}</strong></div>)}
+    </div> : null}
+    <Link className="button button-primary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link>
+  </div>;
+}
+export function OrderTrackingPage() {
+  const { orderId = "" } = useParams();
+  const navigate = useNavigate();
+  const [value, setValue] = useState(orderId);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof trackOrder>> | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    setValue(orderId);
+    setResult(null);
+    setError("");
+    if (!orderId) return;
+    let active = true;
+    setLoading(true);
+    trackOrder(orderId)
+      .then((data) => { if (active) setResult(data); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Status pesanan belum dapat dimuat."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [orderId]);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = value.trim();
+    if (normalized) navigate(`/order-tracking/${encodeURIComponent(normalized)}`);
+  };
+  return <div className="page-container">
+    <PageIntro eyebrow="ORDER STATUS" title="Lacak pesanan" description="Pantau status pesanan ASRI menggunakan nomor pesanan." />
+    <form className="order-lookup-card" onSubmit={submit}>
+      <label htmlFor="tracking-id">Nomor pesanan</label>
+      <input id="tracking-id" required value={value} onChange={(event) => setValue(event.target.value)} placeholder="Masukkan nomor pesanan" />
+      <button className="button button-primary button-full" type="submit" disabled={loading}>Periksa status <ArrowRight size={16} /></button>
+    </form>
+    {loading ? <div className="integration-notice"><Package size={20} /><p>Memuat status pesanan…</p></div> : null}
+    {error ? <div className="integration-notice" role="alert"><Package size={20} /><p>{error}</p></div> : null}
+    {result ? <div className="order-lookup-card">
+      <div className="tracking-reference"><span>Nomor pesanan</span><strong>{result.order.merchant_order_id}</strong></div>
+      <p>Status pesanan: <strong>{result.order.status}</strong></p>
+      <p>Status pembayaran: <strong>{result.order.payment_status}</strong></p>
+      <p>Total pembayaran: <strong>{formatRupiah(result.order.total_amount)}</strong></p>
+      <h2>Rincian item</h2>
+      {result.items.map((item, index) => <div className="checkout-total" key={`${item.product_name}-${index}`}><span>{item.product_name} × {item.quantity}</span><strong>{formatRupiah(item.unit_price * item.quantity)}</strong></div>)}
+    </div> : null}
+  </div>;
+}

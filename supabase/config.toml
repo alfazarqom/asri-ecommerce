@@ -7,3 +7,7 @@ verify_jwt = false
 [functions.duitku-callback]
 # Duitku authenticates callbacks with the documented HMAC signature.
 verify_jwt = false
+
+[functions.get-asri-products]
+# Public catalog feed; the function uses service_role server-side and exposes read-only rows.
+verify_jwt = false

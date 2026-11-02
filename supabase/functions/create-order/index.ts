@@ -87,7 +87,11 @@ Deno.serve(async (request) => {
     );
     const forwardedFor = request.headers.get("x-forwarded-for");
     const clientIp = request.headers.get("cf-connecting-ip")?.trim() ||
-      (forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(-1) : "");
+      (forwardedFor
+        ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).at(
+          -1,
+        )
+        : "");
     if (!clientIp) {
       return response(400, { error: "client_ip_unavailable" });
     }

@@ -43,3 +43,36 @@ export async function createOrder(customer: CreateOrderInput, cart: CartLine[], 
   }
   return body as unknown as CreatedOrder;
 }
+
+export interface CreatedPayment {
+  merchant_order_id: string;
+  reference: string | null;
+  payment_url: string;
+  status: string;
+}
+
+export async function createPayment(merchantOrderId: string): Promise<CreatedPayment> {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  if (!baseUrl) throw new Error("Konfigurasi backend belum tersedia.");
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!anonKey) throw new Error("Konfigurasi akses backend belum tersedia.");
+  const response = await fetch(`${baseUrl}/functions/v1/create-payment`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: anonKey,
+      authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ merchant_order_id: merchantOrderId }),
+  });
+  const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok || typeof body.payment_url !== "string") {
+    const messages: Record<string, string> = {
+      order_not_payable: "Pesanan tidak lagi dapat dibayar.",
+      order_expired: "Batas waktu pembayaran pesanan telah berakhir.",
+      invoice_creation_already_started: "Invoice sedang diproses. Coba muat ulang beberapa saat lagi.",
+    };
+    throw new Error(messages[String(body.error)] || "Invoice pembayaran belum dapat dibuat.");
+  }
+  return body as unknown as CreatedPayment;
+}

@@ -289,7 +289,7 @@ begin
     select *
       from public.orders
      where status = 'pending_payment'
-       and payment_status = 'pending'
+       and payment_status in ('pending', 'failed')
        and expires_at <= now()
        and stock_released_at is null
      order by expires_at, id
@@ -340,14 +340,14 @@ begin
              updated_at = now()
        where id = v_order.id
          and stock_released_at is null
-         and payment_status = 'pending';
+         and payment_status in ('pending', 'failed');
 
       update public.payment_transactions
          set status = 'expired',
              provider_result_code = coalesce(provider_result_code, 'EXPIRED'),
              updated_at = now()
        where order_id = v_order.id
-         and status in ('creating', 'pending');
+         and status in ('creating', 'pending', 'failed');
 
       v_expired := v_expired + 1;
     else
@@ -606,3 +606,69 @@ revoke all on function public.apply_duitku_callback(
 grant execute on function public.apply_duitku_callback(
   text, text, bigint, text, text, text, text, text[], jsonb
 ) to service_role;
+
+-- Mark a reconciliation case resolved only after an operator has completed
+-- the corresponding manual action in the Duitku merchant portal.
+create or replace function public.resolve_asri_reconciliation_case(
+  p_case_id uuid,
+  p_resolution text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_case public.payment_reconciliation_cases%rowtype;
+begin
+  if p_case_id is null or p_resolution not in ('refunded', 'resolved') then
+    raise exception 'Invalid reconciliation resolution' using errcode = '22023';
+  end if;
+
+  select * into v_case
+    from public.payment_reconciliation_cases
+   where id = p_case_id
+     and status = 'open'
+   for update;
+  if not found then
+    raise exception 'Open reconciliation case not found' using errcode = 'P0002';
+  end if;
+
+  if p_resolution = 'refunded' then
+    update public.payment_transactions
+       set status = 'refunded',
+           updated_at = now()
+     where order_id = v_case.order_id
+       and status = 'paid';
+    if not found then
+      raise exception 'Paid payment transaction not found' using errcode = 'P0002';
+    end if;
+
+    update public.orders
+       set status = 'cancelled',
+           payment_status = 'refunded',
+           updated_at = now()
+     where id = v_case.order_id;
+  end if;
+
+  update public.payment_reconciliation_cases
+     set status = 'resolved',
+         details = details || jsonb_build_object(
+           'resolution', p_resolution,
+           'resolved_at', now()
+         ),
+         updated_at = now()
+   where id = p_case_id;
+
+  return jsonb_build_object(
+    'ok', true,
+    'case_id', p_case_id,
+    'resolution', p_resolution
+  );
+end;
+$$;
+
+revoke all on function public.resolve_asri_reconciliation_case(uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.resolve_asri_reconciliation_case(uuid, text)
+  to service_role;

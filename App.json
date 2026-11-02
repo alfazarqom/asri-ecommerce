@@ -1,13 +1,23 @@
 {
   "App": {
     "AppShell": {
-      "Header": {},
+      "Header": {
+        "AppLogo": {},
+        "SearchButton": {},
+        "CartButton": {},
+        "ProfileButton": {}
+      },
       "Main": {
         "HomePage": {},
         "ProductPage": {
           "Categories": {}
-        }
-      }
+        },
+        "SearchPage": {},
+        "WishlistPage": {},
+        "OrdersPage": {},
+        "ProfilePage": {}
+      },
+      "BottomNavigation": {}
     },
     "Standalone": {
       "Layout": {
@@ -15,8 +25,14 @@
         "BottomActionBar": {}
       },
       "ProductDetailPage": {},
+      "ProductReviewsPage": {},
+      "ProductQuestionsPage": {},
+      "RelatedProductsPage": {},
       "CartPage": {},
       "CheckoutPage": {},
+      "AddressPage": {},
+      "ShippingPage": {},
+      "PaymentPage": {},
       "PaymentReturnPage": {},
       "OrderDetailPage": {},
       "OrderTrackingPage": {}
@@ -25,6 +41,8 @@
       "Modal": {},
       "BottomDrawer": {},
       "QuickView": {},
+      "ConfirmationDialog": {},
+      "ImageViewer": {},
       "Toast": {}
     }
   }

@@ -50,7 +50,21 @@ export function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  const [requestKey, setRequestKey] = useState(() => {
+    try {
+      return sessionStorage.getItem("asri-checkout-request-key") ||
+        crypto.randomUUID();
+    } catch {
+      return crypto.randomUUID();
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("asri-checkout-request-key", requestKey);
+    } catch {
+      // The server still enforces idempotency for the current in-memory key.
+    }
+  }, [requestKey]);
 
   if (!cart.length) return <div className="page-container"><EmptyState title="Keranjang kosong" description="Tambahkan produk sebelum checkout." action="Lihat produk" /></div>;
 
@@ -61,10 +75,16 @@ export function CheckoutPage() {
     setError("");
     try {
       const order = await createOrder({ name, email, phone, address }, cart, requestKey);
+      const nextRequestKey = crypto.randomUUID();
+      try {
+        sessionStorage.setItem("asri-checkout-request-key", nextRequestKey);
+      } catch {
+        // Keep the new key in component state if session storage is unavailable.
+      }
+      setRequestKey(nextRequestKey);
       clearCart();
       notify("Pesanan berhasil dibuat. Lanjutkan ke pembayaran.", "success");
       navigate(`/payment?orderId=${encodeURIComponent(order.order_id)}`);
-      setRequestKey(crypto.randomUUID());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Pesanan belum dapat dibuat.");
     } finally {

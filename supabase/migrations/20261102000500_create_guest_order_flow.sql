@@ -57,6 +57,8 @@ begin
     raise exception 'Invalid order input' using errcode = '22023';
   end if;
 
+  perform pg_advisory_xact_lock(hashtextextended(p_request_key, 0));
+
   select * into v_existing from public.orders where request_key = p_request_key;
   if found then
     return jsonb_build_object(

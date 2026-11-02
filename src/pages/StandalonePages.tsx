@@ -6,6 +6,7 @@ import { formatRupiah } from "../lib/format";
 import { ProductCard } from "../components/ProductCard";
 import { EmptyState } from "../components/States";
 import { Modal } from "../components/Overlays";
+import { createOrder } from "../lib/checkout";
 
 function PageIntro({ eyebrow, title, description }: { eyebrow?: string; title: string; description?: string }) {
   return <div className="standalone-intro">{eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}<h1>{title}</h1>{description ? <p>{description}</p> : null}</div>;
@@ -38,14 +39,44 @@ export function CartPage() {
 }
 
 export function CheckoutPage() {
-  const cart = useStore(s => s.cart); const subtotal = cart.reduce((sum,l)=>sum+l.product.price*l.quantity,0);
-  const [name,setName] = useState(""); const [email,setEmail] = useState(""); const [phone,setPhone] = useState(""); const [address,setAddress] = useState("");
+  const cart = useStore(s => s.cart);
+  const subtotal = cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
+  const clearCart = useStore(s => s.clearCart);
+  const notify = useStore(s => s.notify);
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+
   if (!cart.length) return <div className="page-container"><EmptyState title="Keranjang kosong" description="Tambahkan produk sebelum checkout." action="Lihat produk" /></div>;
-  return <div className="page-container checkout-page"><PageIntro eyebrow="SECURE CHECKOUT" title="Informasi pengiriman" description="Isi detail penerima untuk melanjutkan." /><form className="checkout-form" onSubmit={e=>{e.preventDefault(); useStore.getState().notify("Form tersimpan sementara. Checkout belum diaktifkan karena API pembuatan order belum tersedia.","info");}}><div className="form-section"><h2>Kontak penerima</h2><label>Nama lengkap<input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nama penerima" /></label><div className="form-grid"><label>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="nama@email.com" /></label><label>Nomor WhatsApp<input required value={phone} onChange={e=>setPhone(e.target.value)} placeholder="08xxxxxxxxxx" /></label></div></div><div className="form-section"><h2><MapPin size={18} /> Alamat pengiriman</h2><label>Alamat lengkap<textarea required rows={3} value={address} onChange={e=>setAddress(e.target.value)} placeholder="Jalan, nomor rumah, RT/RW, kelurahan…" /></label><p className="form-hint">Pastikan alamat lengkap dan mudah ditemukan kurir.</p></div><div className="checkout-total"><span>Subtotal produk</span><strong>{formatRupiah(subtotal)}</strong></div><div className="integration-notice"><CircleHelp size={18} /><p>Integrasi pembuatan order belum tersedia di repository. Form ini belum mengirim data atau membuat pesanan.</p></div><button className="button button-primary button-full" type="submit">Simpan detail checkout <ArrowRight size={16} /></button></form></div>;
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const order = await createOrder({ name, email, phone, address }, cart, requestKey);
+      clearCart();
+      notify("Pesanan berhasil dibuat. Lanjutkan ke pembayaran.", "success");
+      navigate(`/payment?orderId=${encodeURIComponent(order.order_id)}`);
+      setRequestKey(crypto.randomUUID());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Pesanan belum dapat dibuat.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return <div className="page-container checkout-page"><PageIntro eyebrow="SECURE CHECKOUT" title="Informasi pengiriman" description="Isi detail penerima untuk melanjutkan." /><form className="checkout-form" onSubmit={submit}><div className="form-section"><h2>Kontak penerima</h2><label>Nama lengkap<input required minLength={2} maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="Nama penerima" /></label><div className="form-grid"><label>Email<input type="email" required maxLength={255} value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@email.com" /></label><label>Nomor WhatsApp<input required minLength={8} maxLength={30} value={phone} onChange={e => setPhone(e.target.value)} placeholder="08xxxxxxxxxx" /></label></div></div><div className="form-section"><h2><MapPin size={18} /> Alamat pengiriman</h2><label>Alamat lengkap<textarea required minLength={8} maxLength={1000} rows={3} value={address} onChange={e => setAddress(e.target.value)} placeholder="Jalan, nomor rumah, RT/RW, kelurahan…" /></label><p className="form-hint">Ongkos kirim tetap Rp52.000 ke seluruh Indonesia.</p></div><div className="checkout-total"><span>Subtotal sementara (dihitung ulang server)</span><strong>{formatRupiah(subtotal)}</strong></div>{error ? <div className="integration-notice" role="alert"><CircleHelp size={18} /><p>{error}</p></div> : null}<button className="button button-primary button-full" type="submit" disabled={submitting}>{submitting ? "Membuat pesanan…" : "Buat pesanan"} <ArrowRight size={16} /></button></form></div>;
 }
 export function AddressPage() { return <div className="page-container"><PageIntro title="Alamat pengiriman" description="Kelola alamat untuk pesananmu." /><EmptyState title="Belum ada alamat tersimpan" description="Alamat dapat diisi saat checkout tamu." action="Kembali ke checkout" to="/checkout" icon="package" /></div>; }
-export function ShippingPage() { return <div className="page-container"><PageIntro title="Pengiriman" description="Pilihan pengiriman pesanan." /><div className="integration-notice"><Truck size={20} /><p>Opsi pengiriman dan perhitungan ongkir belum terhubung ke layanan backend. Tidak ada tarif yang diasumsikan.</p></div><Link className="button button-primary" to="/checkout">Kembali ke checkout</Link></div>; }
-export function PaymentPage() { return <div className="page-container"><PageIntro title="Pembayaran" description="Lanjutkan pembayaran setelah order berhasil dibuat." /><div className="payment-method-card"><span className="payment-icon"><Wallet /></span><div><strong>Duitku POP</strong><p>Pembayaran online melalui kanal yang tersedia di Duitku.</p></div><span className="status-pill pending">Belum terhubung</span></div><div className="integration-notice"><ShieldCheck size={20} /><p>Invoice Duitku harus dibuat dari backend tepercaya. Secret internal tidak boleh disimpan atau dipanggil dari browser. Endpoint order creation belum tersedia.</p></div><Link className="button button-secondary" to="/cart">Kembali ke keranjang</Link></div>; }
+export function ShippingPage() { return <div className="page-container"><PageIntro title="Pengiriman" description="Pilihan pengiriman pesanan." /><div className="integration-notice"><Truck size={20} /><p>Ongkos kirim tetap Rp52.000 untuk seluruh Indonesia.</p></div><Link className="button button-primary" to="/checkout">Kembali ke checkout</Link></div>; }
+export function PaymentPage() { const [params] = useSearchParams(); const orderId = params.get("orderId") || ""; return <div className="page-container"><PageIntro title="Pembayaran" description="Pesanan sudah dibuat. Invoice Duitku akan tersedia setelah proses integrasi pembayaran backend selesai." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><div className="payment-method-card"><span className="payment-icon"><Wallet /></span><div><strong>Duitku POP</strong><p>Invoice belum dibuat oleh tahap ini.</p></div><span className="status-pill pending">Menunggu</span></div><Link className="button button-secondary" to="/orders">Lacak pesanan</Link></div>; }
 export function PaymentReturnPage() { const [params] = useSearchParams(); const orderId = params.get("merchantOrderId") || params.get("orderId"); return <div className="page-container payment-return"><span className="success-illustration"><ShieldCheck size={32} /></span><PageIntro eyebrow="PAYMENT RETURN" title="Pembayaran sedang diverifikasi" description="Status dari halaman kembali tidak dianggap sebagai bukti pembayaran berhasil. Status final harus dikonfirmasi backend melalui callback Duitku." /><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId || "Belum tersedia"}</strong></div><Link className="button button-primary button-full" to="/orders">Lihat pesanan</Link><Link className="text-link center-link" to="/">Kembali ke beranda</Link></div>; }
 export function OrderDetailPage() { const { orderId = "" } = useParams(); return <div className="page-container"><PageIntro title="Detail pesanan" description="Ringkasan informasi pesanan." /><div className="integration-notice"><Package size={20} /><p>Data detail pesanan belum dapat dimuat karena endpoint order dan tracking belum tersedia.</p></div><div className="tracking-reference"><span>Nomor pesanan</span><strong>{orderId}</strong></div><Link className="button button-primary" to={`/order-tracking/${encodeURIComponent(orderId)}`}>Lacak pesanan</Link></div>; }
 export function OrderTrackingPage() { const { orderId = "" } = useParams(); const [value,setValue] = useState(orderId); return <div className="page-container"><PageIntro eyebrow="ORDER STATUS" title="Lacak pesanan" description="Pantau perjalanan pesanan ASRI kamu." /><form className="order-lookup-card" onSubmit={e=>{e.preventDefault(); window.history.replaceState({}, "", `/order-tracking/${encodeURIComponent(value)}`); useStore.getState().notify("Nomor pesanan disiapkan. Status belum dapat dimuat tanpa API tracking.","info");}}><label htmlFor="tracking-id">Nomor pesanan</label><input id="tracking-id" required value={value} onChange={e=>setValue(e.target.value)} placeholder="Masukkan nomor pesanan" /><button className="button button-primary button-full" type="submit">Periksa status <ArrowRight size={16} /></button></form><div className="integration-notice"><Package size={20} /><p>Layanan tracking tamu belum tersedia. Status pesanan tidak akan ditebak atau dibuat secara lokal.</p></div></div>; }

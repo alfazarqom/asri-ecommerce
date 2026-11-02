@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, ArrowUpDown, Search, SlidersHorizontal, Sparkles, Truck, ShieldCheck, Headphones, X, Package } from "lucide-react";
+import { ArrowRight, ArrowUpDown, Search, SlidersHorizontal, Sparkles, Truck, ShieldCheck, Headphones, X, Package, Heart } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ProductCard } from "../components/ProductCard";
 import { EmptyState, ErrorState, ProductSkeletons } from "../components/States";

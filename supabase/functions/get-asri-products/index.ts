@@ -1,13 +1,18 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "apikey, authorization, content-type, x-client-info",
+  "Access-Control-Allow-Headers":
+    "apikey, authorization, content-type, x-client-info",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
 
-function jsonResponse(status: number, body: unknown, extraHeaders: Record<string, string> = {}) {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  extraHeaders: Record<string, string> = {},
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -19,7 +24,10 @@ function jsonResponse(status: number, body: unknown, extraHeaders: Record<string
   });
 }
 
-function parseNonNegativeInteger(value: string | null, fallback: number): number | null {
+function parseNonNegativeInteger(
+  value: string | null,
+  fallback: number,
+): number | null {
   if (value === null || value.trim() === "") return fallback;
   if (!/^\d+$/.test(value)) return null;
   const parsed = Number(value);
@@ -32,7 +40,9 @@ Deno.serve(async (request) => {
   }
 
   if (request.method !== "GET") {
-    return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "GET, OPTIONS" });
+    return jsonResponse(405, { error: "method_not_allowed" }, {
+      Allow: "GET, OPTIONS",
+    });
   }
 
   try {
@@ -48,10 +58,16 @@ Deno.serve(async (request) => {
     const offset = parseNonNegativeInteger(url.searchParams.get("offset"), 0);
 
     if (limit === null || limit < 1 || limit > 1000) {
-      return jsonResponse(400, { error: "invalid_limit", message: "limit must be an integer from 1 to 1000" });
+      return jsonResponse(400, {
+        error: "invalid_limit",
+        message: "limit must be an integer from 1 to 1000",
+      });
     }
     if (offset === null || offset > 1000000) {
-      return jsonResponse(400, { error: "invalid_offset", message: "offset must be an integer from 0 to 1000000" });
+      return jsonResponse(400, {
+        error: "invalid_offset",
+        message: "offset must be an integer from 0 to 1000000",
+      });
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -74,7 +90,10 @@ Deno.serve(async (request) => {
       "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
     });
   } catch (error) {
-    console.error("Unexpected get-asri-products error:", error instanceof Error ? error.message : "unknown");
+    console.error(
+      "Unexpected get-asri-products error:",
+      error instanceof Error ? error.message : "unknown",
+    );
     return jsonResponse(500, { error: "internal_server_error" });
   }
 });

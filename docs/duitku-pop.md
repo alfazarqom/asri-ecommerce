@@ -1,130 +1,194 @@
-# Duitku POP — Supabase Edge Functions
+# Requirement V1 — Guest Checkout, Duitku POP, and Order Lifecycle
 
-Status: implementation draft in repository; not deployed and not connected to a Supabase project.
+Status: implementation is on the feature branch and remains unmerged. No Supabase project migration, Edge Function deployment, production secret change, or live payment has been performed.
 
-Official references checked: 2 November 2026.
-- POP: https://docs.duitku.com/pop/id/
-- Transaction status verification: https://docs.duitku.com/api/id/
+Official documentation checked 2 November 2026:
+- Duitku POP: https://docs.duitku.com/pop/id/
+- Duitku API / Cek Transaksi / expiry periods: https://docs.duitku.com/api/id/
 
-## Components
+## End-to-end architecture
 
-- `supabase/functions/_shared/duitku.ts`: HMAC-SHA256, environment selection, email validation, transaction-status response validation, and safe response helpers.
-- `supabase/functions/_shared/duitku_test.ts`: unit tests for email validation and provider-status matching.
-- `supabase/functions/duitku-create-invoice/index.ts`: server-to-server invoice creation.
-- `supabase/functions/duitku-callback/index.ts`: signed callback receiver and independent transaction-status verification.
-- `supabase/migrations/20261102000100_create_duitku_payment_schema.sql`: order snapshots, payment transactions, callback events, and initial atomic callback RPC.
-- `supabase/migrations/20261102000200_verify_duitku_callback_status.sql`: applies only independently verified transaction status values.
-- `supabase/config.toml`: disables JWT verification for the two endpoints; each endpoint applies its own authentication mechanism.
+1. Guest checkout calls `POST /functions/v1/create-order` with customer details, product IDs, quantities, and a browser-persisted idempotency key.
+2. The Edge Function validates input and rate limits the caller. The database RPC reloads product rows from `public.products`, applies the approved sale-price rule, checks availability and stock, calculates integer IDR totals, applies Rp52.000 shipping, creates a 24-hour order, and decrements tracked stock in one transaction.
+3. The customer is sent to `/payment?orderId=...`. The page calls `POST /functions/v1/create-payment`.
+4. The public payment function checks the order and expiry, rate limits the caller, then invokes the internal `duitku-create-invoice` function using `DUITKU_INTERNAL_API_SECRET`. The browser never receives this secret.
+5. The invoice function reloads persisted order/item snapshots, validates totals and expiry, signs the Create Invoice request, persists the provider reference/payment URL, and returns the payment URL to the page.
+6. The PaymentPage redirects the customer to the Duitku payment URL. Browser return/JS parameters are display-only and never update payment status.
+7. Duitku sends its HTTP callback to `duitku-callback`. The function validates the documented HMAC callback signature, independently checks the transaction with Duitku Cek Transaksi, and sends only the verified status to the database RPC.
+8. The callback RPC locks the order before the payment transaction, applies an idempotent state transition, and handles late success by trying to reacquire stock atomically.
+9. `expire-orders` invokes the expiry RPC. The RPC locks expired orders, restores stock once, marks the order expired, and records reconciliation cases if stock cannot be restored.
+10. `order-tracking` exposes a limited guest view protected by a 128-bit random order ID and per-IP/per-order rate limits.
 
-## Required environment variables
+## Edge Functions
 
-Configure these in Supabase Edge Function secrets; never commit their values:
+| Function | Gateway JWT | Authentication / purpose |
+|---|---:|---|
+| `create-order` | Required | Public guest checkout using the Supabase anon JWT; rate limited |
+| `create-payment` | Required | Public guest payment initiation; calls the internal invoice function |
+| `duitku-create-invoice` | Disabled | Server-to-server only; requires `x-internal-secret` |
+| `duitku-callback` | Disabled | Public Duitku callback; verifies HMAC and provider status |
+| `order-tracking` | Required | Public guest tracking using anon JWT; rate limited |
+| `expire-orders` | Disabled | Internal scheduled worker; requires `x-internal-secret` |
+| `get-asri-products` | Disabled | Public catalog read function |
 
-| Name | Purpose |
+## Required Supabase Edge Function secrets
+
+Configure values in the Supabase Edge Function secret manager. Never commit or paste secret values.
+
+| Secret | Purpose |
 |---|---|
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only database access |
 | `DUITKU_MERCHANT_CODE` | Duitku Merchant Code |
-| `DUITKU_API_KEY` | Duitku Merchant/API key used for documented HMAC |
+| `DUITKU_API_KEY` | Duitku Merchant/API key for HMAC |
 | `DUITKU_ENVIRONMENT` | Exactly `sandbox` or `production` |
 | `DUITKU_CALLBACK_URL` | Public HTTPS URL of `duitku-callback` |
 | `DUITKU_RETURN_URL` | Customer return URL |
-| `DUITKU_INTERNAL_API_SECRET` | Secret for trusted server-to-server invoice creation |
+| `DUITKU_INTERNAL_API_SECRET` | Shared internal secret for invoice and expiry worker endpoints |
 
 Optional:
-- `DUITKU_PAYMENT_METHOD`: fixed payment method code, if the merchant intentionally restricts channels.
-- `DUITKU_EXPIRY_PERIOD`: positive integer in minutes; omitted if unset. Confirm the merchant's intended expiry with Duitku before configuring it.
+- `DUITKU_PAYMENT_METHOD`: fixed channel code if the merchant deliberately restricts channels.
+- `DUITKU_EXPIRY_PERIOD`: integer minutes passed to Create Invoice. Provider maximum/default expiry varies by payment channel. Confirm the selected channel's limits before setting this value.
 
-## Database contract
+The database order expiry is fixed at 24 hours. Duitku's provider-side expiry may vary by channel; the backend does not assume that every payment channel supports the same 24-hour expiry. Any verified late success after local stock release enters the atomic stock-reacquisition flow.
 
-An order must exist before an invoice can be created. The trusted order-creation process must insert:
+## Create order and stock rules
 
-1. `orders`: unique `merchant_order_id`, customer details, address snapshots, integer IDR `subtotal_amount`, `shipping_amount`, and `total_amount`.
-2. `order_items`: immutable name/price/quantity snapshots. `line_total` is generated by PostgreSQL.
+Migration files:
+- `20261102000500_create_guest_order_flow.sql`
+- `20261102000600_order_payment_reliability.sql`
 
-The migration creates one payment transaction per order. It deliberately does not create a checkout/order-creation API, product catalog, stock reservation, shipping rules, refund executor, or admin workflow. Those require separate business requirements and integration with the actual product/inventory model.
+The database is authoritative:
+- Product rows are read from `public.products`.
+- `sale_price` is used only when it is non-null, greater than zero, and lower than `price`; otherwise `price` is used.
+- IDR prices must be integer amounts.
+- Shipping is fixed at Rp52.000.
+- Stock with a non-null `inventory` value is decremented at order creation.
+- Order IDs use 128-bit random suffixes.
+- Checkout request keys are persisted in session storage and protected by an advisory transaction lock and unique index.
+- Duplicate order requests return the existing order rather than decrementing stock again.
+- Order expiry is 24 hours after creation.
 
-All four tables have RLS enabled and no client policies. Access is intended through the service role from trusted Edge Functions only. Do not expose the service role key to a browser.
+## Invoice creation
 
-## Create invoice contract
+Public caller:
+- `POST /functions/v1/create-payment`
+- JSON body: `{ "merchant_order_id": "ASRI-..." }`
+- Requires the normal Supabase anon JWT at the Edge Function gateway.
 
-POST `/functions/v1/duitku-create-invoice`
+Internal invoice endpoint:
+- `POST /functions/v1/duitku-create-invoice`
+- Header: `x-internal-secret: <DUITKU_INTERNAL_API_SECRET>`
+- JSON body: `{ "merchant_order_id": "ASRI-..." }`
 
-Headers:
-- `content-type: application/json`
-- `x-internal-secret: <DUITKU_INTERNAL_API_SECRET>`
+Create Invoice follows the current POP documentation:
+- POST JSON to the sandbox or production `/api/merchant/createInvoice` endpoint.
+- Timestamp is Unix milliseconds.
+- `stringToSign = merchantCode + timestamp`.
+- `signature = HMAC_SHA256(stringToSign, apiKey)`.
+- Send `x-duitku-merchantcode`, `x-duitku-timestamp`, and `x-duitku-signature`.
+- Validate HTTP status and provider `statusCode` separately.
+- Validate returned payment URL origin against the selected sandbox/production Duitku host.
+- Persist provider reference and payment URL before returning them to the browser.
+- If the provider may have created an invoice but persistence fails or times out, leave the transaction for reconciliation; do not automatically create a second invoice.
 
-Body:
-```json
-{ "merchant_order_id": "merchant-generated-unique-id" }
-```
+## Callback and transaction verification
 
-This endpoint is intentionally server-to-server. Do not call it directly from an untrusted browser because the internal secret must never be exposed to frontend code. A trusted order-creation/backend function should invoke it.
-
-The function reloads the persisted order and item snapshots, verifies the total, validates the customer's email (maximum 255 characters), and signs the POP request using:
-```text
-stringToSign = merchantCode + timestamp
-signature = HMAC_SHA256(stringToSign, apiKey)
-```
-
-It uses the documented POP headers:
-- `x-duitku-merchantcode`
-- `x-duitku-timestamp` (Unix milliseconds)
-- `x-duitku-signature`
-
-The invoice response returns only merchant order ID, Duitku reference, payment URL, and local status. A second request returns the existing pending invoice when available; it does not create a second invoice for the same order.
-
-## Callback verification contract
-
-Duitku POP sends `application/x-www-form-urlencoded` callback fields. The callback HMAC is:
+Duitku POP callback is HTTP POST `application/x-www-form-urlencoded`. Its HMAC is:
 ```text
 stringToSign = merchantCode + amount + merchantOrderId
 signature = HMAC_SHA256(stringToSign, apiKey)
 ```
 
-Important: the documented callback signature does **not** cover `resultCode` or `reference`. A valid callback HMAC alone therefore cannot authenticate those two values. The implementation does not use the callback's unsigned `resultCode` to change payment state.
-
-After validating the callback HMAC, the function calls Duitku's official **Cek Transaksi / transactionStatus** API using:
+The callback signature does not cover `resultCode` or `reference`. The implementation therefore verifies the transaction through the official Cek Transaksi API before applying status:
 - Sandbox: `https://sandbox.duitku.com/webapi/api/merchant/transactionStatus`
 - Production: `https://passport.duitku.com/webapi/api/merchant/transactionStatus`
 - Request signature: `HMAC_SHA256(merchantCode + merchantOrderId, apiKey)`
-- Request fields: merchant code, merchant order ID, and signature.
+- Request body follows the official JSON examples, even though the docs' type label says x-www-form-urlencoded.
+- The provider response must match merchant order ID, reference, amount, and a known status.
 
-The provider response must match the callback's merchant order ID, reference, and amount. Only the provider's independently returned `statusCode` is passed to the database RPC:
-- `00`: verified success; payment becomes `paid`.
-- `01`: verified pending; payment remains `pending`.
-- `02`: verified canceled; payment becomes `failed`.
-- Any unrecognized status or any response mismatch is rejected and not acknowledged as processed.
+Verified Cek Transaksi status:
+- `00`: success.
+- `01`: pending/process.
+- `02`: failed/expired.
 
-The API documentation's executable PHP/cURL examples send JSON, while its request-type label says `x-www-form-urlencoded`; this discrepancy is retained as an integration caveat and should be confirmed with Duitku before production. The code follows the JSON request examples.
+The RPC stores callback events using a unique event key bound to merchant code, amount, merchant order ID, provider reference, and verified status. Duplicate events do not apply inventory changes twice. The order row is locked before the payment row so callback and expiry workers use a consistent lock order.
 
-The database RPC locks the matching payment row, checks amount/reference/order binding, and processes verified state transitions idempotently. Terminal verified callbacks are acknowledged without repeating the provider inquiry. Pending callbacks can be checked again when Duitku sends a subsequent callback; this is callback-driven, not scheduled polling. Duitku warns against repeated automatic transaction-status requests because of rate limits.
+The POP docs require a successful callback endpoint to return HTTP 200 and describe up to five callback retries. This implementation acknowledges only after provider verification and database commit. Browser redirect/JS callbacks are never proof of payment.
 
-The POP and API documentation require HTTP 200 for a successfully handled callback and describe up to five callback delivery attempts. This implementation returns HTTP 200 only after verification and the database transaction commit; transient verification or database failures return a non-200 response so the callback is not silently discarded.
+## Expiry, stock restoration, and late payment
 
-## Important limitations / not yet verified
+`expire-orders`:
+- POST endpoint, no gateway JWT.
+- Requires `x-internal-secret` matching `DUITKU_INTERNAL_API_SECRET`.
+- Calls `expire_asri_orders(100)`.
+- Processes a bounded batch with row locks and `SKIP LOCKED`.
+- Restores stock from immutable order-item quantities only once using `stock_released_at`.
+- Marks pending/failed unpaid orders expired after their 24-hour deadline.
+- Creates an open reconciliation case if a product row needed for stock restoration no longer exists.
 
-- No order-creation function exists in this scope. Another trusted backend process must create the order and item snapshots.
-- No frontend caller exists yet. The internal invoice endpoint must be invoked server-to-server.
-- The schema is a new baseline, not reconciled against a live Supabase schema. Review for naming conflicts before applying.
-- No stock decrement/reservation, expiry worker, cancellation, refund execution, rate limiter, or guest order tracking is included.
-- The migration has not been executed against production. Functions have not been deployed.
-- Sandbox credentials, merchant configuration, callback delivery, and provider behavior have not been tested.
-- The transaction-status endpoint's documented request content-type label conflicts with its JSON examples. Confirm the expected content type with Duitku merchant support before production.
-- Duitku warns about transaction-status API rate limits. The implementation avoids scheduled polling and skips provider checks for already-processed terminal callbacks, but actual merchant rate limits have not been tested.
+A verified late success after stock release:
+- Locks the order and all referenced products.
+- Checks every product's available inventory before decrementing any stock.
+- Reacquires stock atomically when all tracked stock is available and confirms the order.
+- If stock is unavailable, records the provider payment as paid, puts the order in `payment_review`, and creates an open `late_payment_stock_unavailable` case. It does not silently confirm fulfillment.
 
-## Local verification
+The GitHub Actions workflow `.github/workflows/expire-orders.yml` is scheduled every five minutes. After deployment, configure repository secrets:
+- `ASRI_EXPIRY_WORKER_URL`: full HTTPS URL to the deployed `expire-orders` function.
+- `ASRI_EXPIRY_WORKER_SECRET`: same value as Supabase Edge Function secret `DUITKU_INTERNAL_API_SECRET`.
 
-From a local checkout with Supabase CLI and Deno v2 available:
+Until those secrets and the deployed function are configured, the scheduled workflow intentionally skips the request. No schedule has been activated against production in this implementation.
+
+## Guest order tracking and rate limits
+
+`POST /functions/v1/order-tracking` with `{ "merchant_order_id": "ASRI-..." }`.
+
+The endpoint returns only:
+- merchant order ID,
+- order status and payment status,
+- total amount and timestamps,
+- product names, quantities, and unit prices.
+
+It does not return customer name, email, phone, or address. The new order ID has a 128-bit random suffix. Rate limits are:
+- Create order: 5 requests per IP per minute.
+- Create payment: 5 requests per IP per minute.
+- Guest tracking: 20 requests per IP per minute and 5 requests per IP/order per minute.
+
+Rate-limit keys are SHA-256 hashes; raw IP addresses are not persisted.
+
+## Refund and reconciliation
+
+There is no automated Duitku refund API call in this implementation. A late payment without stock creates an open reconciliation case. The operator must:
+1. Review the case and the verified paid provider transaction.
+2. Perform the refund through the merchant's approved Duitku process/dashboard.
+3. Only after the provider refund is confirmed, call the service-role-only `resolve_asri_reconciliation_case(case_id, 'refunded')` RPC to mark the payment and order refunded and close the case.
+
+The RPC is not exposed to anon/authenticated clients. A `'resolved'` resolution closes a case without claiming a provider refund occurred. The service-role-only `cancel_asri_unpaid_order(merchant_order_id)` RPC supports admin cancellation of an unpaid order and restores stock once; it refuses paid/terminal orders and opens a review case if stock cannot be restored. Do not mark a case refunded before the external refund is actually complete.
+
+## Verification
+
+CI workflows:
+- `.github/workflows/deno-check.yml`: Deno type-check, lint, unit tests, and formatting.
+- `.github/workflows/supabase-migration.yml`: clean local Supabase migration reset, Requirement V1 SQL lifecycle tests, and local schema lint.
+- `.github/workflows/frontend-ci.yml`: frontend build and Playwright browser smoke tests.
+- `.github/workflows/expire-orders.yml`: scheduled expiry worker invocation after deployment secrets are configured.
+
+Local commands:
 ```sh
-deno check supabase/functions/_shared/duitku.ts
+deno check supabase/functions/create-order/index.ts
+deno check supabase/functions/create-payment/index.ts
 deno check supabase/functions/duitku-create-invoice/index.ts
 deno check supabase/functions/duitku-callback/index.ts
+deno check supabase/functions/order-tracking/index.ts
+deno check supabase/functions/expire-orders/index.ts
 deno test supabase/functions/
 deno lint supabase/functions/
 deno fmt --check supabase/functions/
 supabase db reset --local
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f supabase/tests/requirement-v1.sql
 supabase db lint --local
+npm run build
+npm run test:e2e
 ```
 
-These commands are executed by repository CI where configured. No production migration, deployment, or live payment test is authorized or claimed by this change.
+These tests are intended for isolated local/CI fixtures. No production migration, deployment, secret configuration, or real payment is performed by CI.

@@ -11,3 +11,19 @@ verify_jwt = false
 [functions.get-asri-products]
 # Public catalog feed; the function uses service_role server-side and exposes read-only rows.
 verify_jwt = false
+
+[functions.create-order]
+# Public guest checkout endpoint; gateway validates the Supabase anon JWT.
+verify_jwt = true
+
+[functions.create-payment]
+# Public gateway-verified guest payment initiation; privileged call uses an internal server secret.
+verify_jwt = true
+
+[functions.order-tracking]
+# Public guest tracking; access is rate-limited and order IDs are high-entropy.
+verify_jwt = true
+
+[functions.expire-orders]
+# Internal scheduled worker protected by DUITKU_INTERNAL_API_SECRET.
+verify_jwt = false

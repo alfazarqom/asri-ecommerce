@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import {
   asRecord,
   constantTimeEqual,
@@ -87,6 +87,7 @@ Deno.serve(async (request) => {
       .select("id")
       .eq("merchant_order_id", merchantOrderId)
       .eq("amount", amount)
+      .eq("provider_reference", reference)
       .eq("processing_status", "processed")
       .in("result_code", ["00", "02"])
       .limit(1)
@@ -165,6 +166,7 @@ Deno.serve(async (request) => {
       merchantCode,
       amountText,
       merchantOrderId,
+      reference,
       verifiedStatusCode,
     ].join("|"));
     safePayload.verifiedStatusCode = verifiedStatusCode;

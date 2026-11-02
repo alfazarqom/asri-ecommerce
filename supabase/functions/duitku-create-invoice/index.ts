@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import {
   asRecord,
   constantTimeEqual,
@@ -26,6 +26,7 @@ type OrderRow = {
   subtotal_amount: number;
   shipping_amount: number;
   total_amount: number;
+  expires_at: string | null;
 };
 
 type ItemRow = {
@@ -86,6 +87,12 @@ Deno.serve(async (request) => {
       typedOrder.payment_status !== "pending"
     ) {
       return jsonResponse(409, { error: "order_not_payable" });
+    }
+    if (
+      !typedOrder.expires_at ||
+      new Date(typedOrder.expires_at).getTime() <= Date.now()
+    ) {
+      return jsonResponse(410, { error: "order_expired" });
     }
     const email = typeof typedOrder.customer_email === "string"
       ? typedOrder.customer_email.trim()
@@ -278,9 +285,21 @@ Deno.serve(async (request) => {
     const reference = safeText(providerData.reference, 100);
     const paymentUrl = safeText(providerData.paymentUrl, 2048);
     const statusMessage = safeText(providerData.statusMessage, 255);
+    const expectedPaymentOrigin = environment === "sandbox"
+      ? "https://app-sandbox.duitku.com"
+      : "https://app-prod.duitku.com";
+    let paymentUrlIsValid = false;
+    try {
+      paymentUrlIsValid =
+        new URL(paymentUrl ?? "").origin === expectedPaymentOrigin;
+    } catch {
+      paymentUrlIsValid = false;
+    }
 
     if (
-      !providerResponse.ok || statusCode !== "00" || !reference || !paymentUrl
+      !providerResponse.ok || statusCode !== "00" || !reference ||
+      !paymentUrl ||
+      !paymentUrlIsValid
     ) {
       await supabase.from("payment_transactions").update({
         status: "failed",

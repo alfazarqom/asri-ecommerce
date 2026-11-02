@@ -31,6 +31,11 @@ jobs:
         run: |
           deno check supabase/functions/duitku-create-invoice/index.ts
           deno check supabase/functions/duitku-callback/index.ts
+          deno check supabase/functions/get-asri-products/index.ts
+          deno check supabase/functions/create-order/index.ts
+          deno check supabase/functions/create-payment/index.ts
+          deno check supabase/functions/order-tracking/index.ts
+          deno check supabase/functions/expire-orders/index.ts
 
       - name: Lint Edge Functions
         run: deno lint supabase/functions/

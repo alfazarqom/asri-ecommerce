@@ -28,7 +28,7 @@ jobs:
           version: latest
 
       - name: Start local Supabase stack
-        run: supabase start
+        run: supabase db start
 
       - name: Apply all migrations to a clean local database
         run: supabase db reset --local

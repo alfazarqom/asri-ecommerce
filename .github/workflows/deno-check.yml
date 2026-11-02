@@ -1,0 +1,39 @@
+name: Deno CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/duitku-pop-edge-functions]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deno-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deno:
+    name: Check, lint, and format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check Duitku Edge Functions
+        run: |
+          deno check supabase/functions/duitku-create-invoice/index.ts
+          deno check supabase/functions/duitku-callback/index.ts
+
+      - name: Lint Edge Functions
+        run: deno lint supabase/functions/
+
+      - name: Check formatting
+        run: deno fmt --check supabase/functions/

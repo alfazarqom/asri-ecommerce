@@ -1,0 +1,41 @@
+name: Supabase Migration CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/duitku-pop-edge-functions]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migration-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration:
+    name: Validate migrations on isolated local database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Apply all migrations to a clean local database
+        run: supabase db reset --local
+
+      - name: Lint local database schema
+        run: supabase db lint --local
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop --no-backup

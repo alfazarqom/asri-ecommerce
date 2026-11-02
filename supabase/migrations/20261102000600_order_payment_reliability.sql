@@ -661,10 +661,29 @@ set search_path = pg_catalog, public
 as $$
 declare
   v_case public.payment_reconciliation_cases%rowtype;
+  v_order public.orders%rowtype;
 begin
   if p_case_id is null or p_resolution is null
      or p_resolution not in ('refunded', 'resolved') then
     raise exception 'Invalid reconciliation resolution' using errcode = '22023';
+  end if;
+
+  -- Read the case to discover its order, then lock in the same order-first
+  -- sequence used by callbacks, expiry, and cancellation.
+  select * into v_case
+    from public.payment_reconciliation_cases
+   where id = p_case_id
+     and status = 'open';
+  if not found then
+    raise exception 'Open reconciliation case not found' using errcode = 'P0002';
+  end if;
+
+  select * into v_order
+    from public.orders
+   where id = v_case.order_id
+   for update;
+  if not found then
+    raise exception 'Reconciliation order not found' using errcode = 'P0002';
   end if;
 
   select * into v_case

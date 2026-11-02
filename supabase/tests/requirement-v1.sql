@@ -212,6 +212,42 @@ begin
     raise exception 'Expected one open late-payment reconciliation case';
   end if;
 
+  update public.products
+     set inventory = 10
+   where id = 'TEST-RELIABILITY-001';
+
+  v_first := public.create_asri_order(
+    'ci-request-key-00000003',
+    'CI Buyer',
+    'ci-buyer@example.test',
+    '081234567890',
+    jsonb_build_object('address', 'Test address'),
+    jsonb_build_array(
+      jsonb_build_object('product_id', 'TEST-RELIABILITY-001', 'quantity', 1)
+    )
+  );
+  v_order_id := v_first->>'order_id';
+
+  v_result := public.cancel_asri_unpaid_order(v_order_id);
+  if v_result->>'ok' <> 'true' then
+    raise exception 'Admin unpaid-order cancellation should succeed';
+  end if;
+
+  select inventory into v_inventory
+    from public.products
+   where id = 'TEST-RELIABILITY-001';
+  if v_inventory <> 10 then
+    raise exception 'Admin cancellation should restore stock exactly once';
+  end if;
+
+  begin
+    perform public.cancel_asri_unpaid_order(v_order_id);
+    raise exception 'Repeated cancellation should be rejected';
+  exception
+    when sqlstate '55000' then
+      null;
+  end;
+
   v_allowed := public.consume_asri_rate_limit(repeat('a', 64), 1, 60);
   if v_allowed is not true then
     raise exception 'First rate-limited request should pass';

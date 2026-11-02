@@ -20,6 +20,44 @@ export function duitkuEndpoint(environment: DuitkuEnvironment): string {
     : "https://api-prod.duitku.com/api/merchant/createInvoice";
 }
 
+export function duitkuTransactionStatusEndpoint(
+  environment: DuitkuEnvironment,
+): string {
+  return environment === "sandbox"
+    ? "https://sandbox.duitku.com/webapi/api/merchant/transactionStatus"
+    : "https://passport.duitku.com/webapi/api/merchant/transactionStatus";
+}
+
+export function isValidEmail(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length <= 255 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+export function isVerifiedTransactionStatus(
+  value: unknown,
+  expected: {
+    merchantOrderId: string;
+    reference: string;
+    amount: number;
+  },
+): value is Record<string, unknown> {
+  const response = asRecord(value);
+  const amountText = typeof response.amount === "string"
+    ? response.amount
+    : typeof response.amount === "number"
+    ? String(response.amount)
+    : "";
+  const amount = /^\d+$/.test(amountText) ? Number(amountText) : NaN;
+
+  return safeText(response.merchantOrderId, 100) ===
+      expected.merchantOrderId &&
+    safeText(response.reference, 100) === expected.reference &&
+    Number.isSafeInteger(amount) &&
+    amount === expected.amount &&
+    ["00", "01", "02"].includes(safeText(response.statusCode, 10) ?? "");
+}
+
 export async function hmacSha256Hex(
   secret: string,
   message: string,
